@@ -18,6 +18,16 @@ public class CraftingUtils {
     private static Map<String, IngredientInfo> allIngredients;
 
     public static IngredientInfo getIng(String name) {
+        initIngs();
+        return allIngredients.get(name);
+    }
+
+    public static Map<String, IngredientInfo> getAllIngs() {
+        initIngs();
+        return allIngredients;
+    }
+
+    private static void initIngs() {
         if (allIngredients == null) {
             try {
                 allIngredients = Models.Ingredient.getAllIngredientInfos()
@@ -27,11 +37,8 @@ public class CraftingUtils {
                         ));
             } catch (Exception e) {
                 System.err.println("Failed to load ingredient list from wynntills");
-                return null;
             }
         }
-
-        return allIngredients.get(name);
     }
 
     public static StatPossibleValues applyMultiplier(StatPossibleValues value, Double multiplier) {
@@ -74,8 +81,14 @@ public class CraftingUtils {
         values.add(toAdd);
     }
 
-    private static RangedValue addRanges(RangedValue a, RangedValue b) {
+    public static RangedValue addRanges(RangedValue a, RangedValue b) {
         return new RangedValue(a.low() + b.low(), a.high() + b.high());
+    }
+
+    public static Double getRangeCenter(RangedValue range) {
+        double distance = range.high() - range.low();
+        double half = distance / 2;
+        return range.low() + half;
     }
 
     public static GearRequirements addGearRequirements(GearRequirements value, List<Pair<Skill, Integer>> toAdd, double multiplier) {

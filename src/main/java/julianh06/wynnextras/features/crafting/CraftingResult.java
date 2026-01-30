@@ -2,8 +2,11 @@ package julianh06.wynnextras.features.crafting;
 
 import com.wynntils.models.elements.type.Skill;
 import com.wynntils.models.gear.type.GearRequirements;
+import com.wynntils.models.items.items.game.CraftedGearItem;
 import com.wynntils.models.stats.type.DamageType;
+import com.wynntils.models.stats.type.StatActualValue;
 import com.wynntils.models.stats.type.StatPossibleValues;
+import com.wynntils.models.stats.type.StatType;
 import com.wynntils.utils.type.Pair;
 import com.wynntils.utils.type.RangedValue;
 import julianh06.wynnextras.features.crafting.data.CraftableType;
@@ -12,45 +15,12 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import org.joml.Vector4i;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
-public class CraftingResult {
-    public CraftableType type;
-    public List<StatPossibleValues> possibleValues;
-    public GearRequirements requirements;
-
-    public RangedValue health;
-    public Integer powderSlots;
-    public RangedValue durability;
-
-    public RangedValue duration;
-    public Integer charges;
-
-    public Map<DamageType, Vector4i> damage;
-
-    public CraftingResult(
-            CraftableType type,
-            List<StatPossibleValues> possibleValues,
-            GearRequirements requirements,
-            RangedValue health,
-            RangedValue durability,
-            Integer powderSlots,
-            Integer charges,
-            RangedValue duration,
-            Map<DamageType, Vector4i> damage
-    ) {
-        this.type = type;
-        this.possibleValues = possibleValues;
-        this.requirements = requirements;
-        this.health = health;
-        this.durability = durability;
-        this.powderSlots = powderSlots;
-        this.charges = charges;
-        this.duration = duration;
-        this.damage = damage;
-    }
+public record CraftingResult(CraftableType type, List<StatPossibleValues> possibleValues, GearRequirements requirements,
+                             RangedValue health, RangedValue durability, Integer powderSlots, Integer charges,
+                             RangedValue duration, Map<DamageType, Vector4i> damage) {
 
     public List<Text> getTooltip() {
         List<Text> tooltip = new ArrayList<>();
@@ -173,5 +143,60 @@ public class CraftingResult {
         }
 
         return result;
+    }
+
+    public boolean equalsIgnoreDurability(CraftedGearItem targetItem, boolean debug) {
+        if (this.type != CraftableType.fromGearType(targetItem.getGearType())) {
+            if(debug) System.out.println("different type");
+            return false;
+        }
+
+        List<StatActualValue> targetIds = targetItem.getIdentifications();
+
+        Set<StatType> targetTypes = targetIds.stream().map(StatActualValue::statType).collect(Collectors.toSet());
+        Set<StatType> thisTypes = possibleValues.stream().map(StatPossibleValues::statType).collect(Collectors.toSet());
+        if (!targetTypes.equals(thisTypes)) return false;
+
+        // Check each possible value against target
+        Map<StatType, Integer> targetMap = targetIds.stream().collect(Collectors.toMap(StatActualValue::statType, StatActualValue::value));
+        for (StatPossibleValues possible : possibleValues) {
+            Integer target = targetMap.get(possible.statType());
+            if (possible.range().low() == 0 && possible.range().high() == 0) continue;
+            if (target == null || !possible.range().inRange(target)) {
+                if(debug) System.out.println("different id for " + possible + "\n" + target);
+                return false;
+            }
+        }
+
+       if(requirementsMatch(targetItem.getRequirements(), this.requirements)) {
+           if(debug) System.out.println("different reqs\n" + targetItem.getRequirements() + "\n" + this.requirements);
+           return false;
+       }
+
+       /*
+       if(!this.health.inRange(targetItem.getHealth())) {
+           System.out.println("health out of range\n" + targetItem.getHealth() + "\n" + this.health);
+           return false;
+       }
+        */
+       List<Pair<DamageType, RangedValue>> damages = targetItem.getDamages(); // TODO
+
+        return true;
+    }
+
+    public static boolean requirementsMatch(GearRequirements a, GearRequirements b) {
+        if (Math.abs(a.level() - b.level()) > 2) return false;
+        if (!Objects.equals(a.classType(), b.classType())) return false;
+        Map<Skill, Integer> aSkills = filterNonZeroSkills(a.skills());
+        Map<Skill, Integer> bSkills = filterNonZeroSkills(b.skills());
+        if (!aSkills.equals(bSkills)) return false;
+        return Objects.equals(a.quest(), b.quest());
+    }
+
+    private static Map<Skill, Integer> filterNonZeroSkills(List<Pair<Skill, Integer>> skills) {
+        if (skills == null) return Map.of();
+        return skills.stream()
+                .filter(pair -> pair != null && pair.b() != null && pair.b() > 0)
+                .collect(Collectors.toMap(Pair::a, Pair::b));
     }
 }

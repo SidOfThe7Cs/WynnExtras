@@ -2,14 +2,20 @@ package julianh06.wynnextras.mixin;
 
 import com.wynntils.models.gear.type.GearTier;
 import com.wynntils.models.items.WynnItem;
+import com.wynntils.models.items.items.game.CraftedGearItem;
 import com.wynntils.models.items.items.game.GearItem;
 import com.wynntils.utils.mc.TooltipUtils;
 import julianh06.wynnextras.config.WynnExtrasConfig;
+import julianh06.wynnextras.features.crafting.CraftingResult;
+import julianh06.wynnextras.features.crafting.Recipe;
+import julianh06.wynnextras.features.crafting.Reverser;
+import julianh06.wynnextras.features.crafting.data.CraftableType;
 import julianh06.wynnextras.features.inventory.WeightDisplay;
 import julianh06.wynnextras.utils.ItemUtils;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.item.ItemStack;
 import net.minecraft.text.Text;
+import org.joml.Vector2i;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -23,6 +29,11 @@ public class TooltipUtilsMixin {
     @Inject(method = "getWynnItemTooltip", at = @At("RETURN"), cancellable = true)
     private static void injectWeights(ItemStack itemStack, WynnItem wynnItem, CallbackInfoReturnable<List<Text>> cir) {
         List<Text> tooltips = cir.getReturnValue();
+
+        if (wynnItem instanceof CraftedGearItem crafted) {
+            new Reverser(crafted).getRecipe();
+            return;
+        }
 
         if (!WynnExtrasConfig.INSTANCE.showWeight) {
             return;
