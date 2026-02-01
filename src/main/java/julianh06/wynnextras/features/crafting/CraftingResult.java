@@ -12,6 +12,8 @@ import julianh06.wynnextras.features.crafting.data.CraftableType;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import org.jetbrains.annotations.NotNull;
+import org.joml.Vector2i;
 import org.joml.Vector4i;
 
 import java.util.*;
@@ -201,10 +203,10 @@ public record CraftingResult(
     }
 
     @Override
-    public String toString() {
+    public @NotNull String toString() {
         StringBuilder sb = new StringBuilder();
         for (Text line : getTooltip()) {
-            sb.append(line.getString());
+            sb.append(line.getString()).append("\n");
         }
         return sb.toString();
     }
@@ -228,45 +230,45 @@ public record CraftingResult(
         if (!requirementsMatch(requirements, that.requirements)) return false;
 
         // Compare possibleValues, filtering out zero ranges
-        List<StatPossibleValues> filteredThis = filterZeroStats(possibleValues);
-        List<StatPossibleValues> filteredThat = filterZeroStats(that.possibleValues);
+        Set<StatPossibleValues> filteredThis = filterZeroStats(possibleValues);
+        Set<StatPossibleValues> filteredThat = filterZeroStats(that.possibleValues);
 
         return filteredThis.equals(filteredThat);
     }
 
     @Override
     public int hashCode() {
-        List<StatPossibleValues> filtered = filterZeroStats(possibleValues);
+        Set<StatPossibleValues> filtered = filterZeroStats(possibleValues);
         return Objects.hash(type, filtered,
                 requirementsHash(requirements),
                 health, durability, powderSlots, charges, duration, damage);
     }
 
     public static boolean requirementsMatch(GearRequirements a, GearRequirements b) {
-        if (Math.abs(a.level() - b.level()) > 2) return false;
+        Vector2i aLvl = new Vector2i(a.level() - 2, a.level());
+        Vector2i bLvl = new Vector2i(b.level() - 2, b.level());
+        if (!aLvl.equals(bLvl)) return false;
         if (!Objects.equals(a.classType(), b.classType())) return false;
         Map<Skill, Integer> aSkills = filterNonZeroSkills(a.skills());
         Map<Skill, Integer> bSkills = filterNonZeroSkills(b.skills());
-        if (!aSkills.equals(bSkills)) return false;
-        return Objects.equals(a.quest(), b.quest());
+        return aSkills.equals(bSkills);
     }
 
     private static int requirementsHash(GearRequirements req) {
         if (req == null) return 0;
         return Objects.hash(
-                req.level(),
+                new Vector2i(req.level() - 2, req.level()),
                 req.classType(),
-                filterNonZeroSkills(req.skills()),
-                req.quest()
+                filterNonZeroSkills(req.skills())
         );
     }
 
-    private static List<StatPossibleValues> filterZeroStats(List<StatPossibleValues> stats) {
-        if (stats == null) return List.of();
+    private static Set<StatPossibleValues> filterZeroStats(List<StatPossibleValues> stats) {
+        if (stats == null) return Set.of();
         return stats.stream()
                 .filter(stat -> stat != null &&
                         !(stat.range().low() == 0 && stat.range().high() == 0))
-                .collect(Collectors.toList());
+                .collect(Collectors.toSet());
     }
 
     private static Map<Skill, Integer> filterNonZeroSkills(List<Pair<Skill, Integer>> skills) {

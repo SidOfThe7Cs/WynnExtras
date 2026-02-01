@@ -124,6 +124,7 @@ public class Reverser {
             validDura.add(info);
         }
 
+        // TODO move to after found ings and test dura
         for (Constants.RecipeRange data : possibleConstantData) {
             mutableRecipe.setConstants(data);
             for (int l = 1; l <= 3; l++) {
@@ -131,9 +132,11 @@ public class Reverser {
                     mutableRecipe.setlMaterialTier(l);
                     mutableRecipe.setsMaterialTier(s);
                     Vector2i recipeHealth = mutableRecipe.getHealth();
+                    possibleMaterialData.add(Triple.of(data, l, s));
+
                     if (recipeHealth != null) {
                         if (recipeHealth.x <= targetHealth && targetHealth <= recipeHealth.y) {
-                            possibleMaterialData.add(Triple.of(data, l, s));
+                            //possibleMaterialData.add(Triple.of(data, l, s));
                         }
                     }
                 }
@@ -206,7 +209,8 @@ public class Reverser {
                 for (IngredientInfo ing : mutableRecipe.getIngredients()) {
                     //System.out.println(ing.name());
                 }
-                //System.out.println();
+                System.out.println("\nadding " + result);
+                System.out.println("hash " + result.hashCode());
                 possibleRecipes.add(result);
             }
 

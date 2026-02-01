@@ -114,10 +114,10 @@ public class Recipe {
         this.ingredients = result;
     }
 
-    public void setFromTriple(Triple<Constants.RecipeRange, Integer, Integer> possibility) {
-        setlMaterialTier(possibility.getMiddle());
-        setsMaterialTier(possibility.getRight());
-        setConstants(possibility.getLeft());
+    public void setFromTriple(Triple<Constants.RecipeRange, Integer, Integer> data) {
+        setlMaterialTier(data.getMiddle());
+        setsMaterialTier(data.getRight());
+        setConstants(data.getLeft());
     }
 
     public void setsMaterialTier(int sMaterialTier) {
