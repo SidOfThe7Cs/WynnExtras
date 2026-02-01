@@ -9,13 +9,13 @@ import com.wynntils.models.items.items.game.CraftedGearItem;
 import com.wynntils.models.stats.type.DamageType;
 import com.wynntils.models.stats.type.StatActualValue;
 import com.wynntils.models.stats.type.StatPossibleValues;
+import com.wynntils.models.stats.type.StatType;
 import com.wynntils.utils.type.CappedValue;
 import com.wynntils.utils.type.Pair;
 import com.wynntils.utils.type.RangedValue;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class HashableCraftedGearItem extends CraftedGearItem {
 
@@ -48,26 +48,27 @@ public class HashableCraftedGearItem extends CraftedGearItem {
         if (o == null || getClass() != o.getClass()) return false;
         HashableCraftedGearItem that = (HashableCraftedGearItem) o;
 
+        Set<Pair<StatType, Integer>> thisPossibleSet = getPossibleValues().stream().map(v -> new Pair<>(v.statType(), v.baseValue())).collect(Collectors.toSet());
+        Set<Pair<StatType, Integer>> thatPossibleSet = that.getPossibleValues().stream().map(v -> new Pair<>(v.statType(), v.baseValue())).collect(Collectors.toSet());
+
         return getGearType() == that.getGearType() &&
                 getHealth() == that.getHealth() &&
                 Objects.equals(getDamages(), that.getDamages()) &&
                 Objects.equals(getRequirements(), that.getRequirements()) &&
-                Arrays.equals(
-                        getPossibleValues().stream().map(StatPossibleValues::baseValue).toArray(),
-                        that.getPossibleValues().stream().map(StatPossibleValues::baseValue).toArray()
-                ) &&
+                Objects.equals(thisPossibleSet, thatPossibleSet) &&
                 getPowderSlots() == that.getPowderSlots() &&
                 getDurability().max() == that.getDurability().max();
     }
 
     @Override
     public int hashCode() {
+        Set<Pair<StatType, Integer>> thisPossibleSet = getPossibleValues().stream().map(v -> new Pair<>(v.statType(), v.baseValue())).collect(Collectors.toSet());
         return Objects.hash(
                 getGearType(),
                 getHealth(),
                 getDamages(),
                 getRequirements(),
-                Arrays.hashCode(getPossibleValues().stream().map(StatPossibleValues::baseValue).toArray()),
+                thisPossibleSet,
                 getPowderSlots(),
                 getDurability().max()
         );

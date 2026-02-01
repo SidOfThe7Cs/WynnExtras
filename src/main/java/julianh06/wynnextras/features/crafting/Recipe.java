@@ -33,6 +33,19 @@ public class Recipe {
     private Vector2i cookingDuration;
     private Vector2i health;
 
+    public Recipe(Recipe other) {
+        this.ingredients = other.ingredients != null ? Arrays.copyOf(other.ingredients, other.ingredients.length) : null;
+        this.sMaterialTier = other.sMaterialTier;
+        this.lMaterialTier = other.lMaterialTier;
+        this.level = other.level != null ? new Vector2i(other.level) : null;
+        this.station = other.station;
+        this.multipliers = other.multipliers != null ? Arrays.copyOf(other.multipliers, other.multipliers.length) : null;
+        this.durability = other.durability != null ? new Vector2i(other.durability) : null;
+        this.consuDuration = other.consuDuration != null ? new Vector2i(other.consuDuration) : null;
+        this.cookingDuration = other.cookingDuration != null ? new Vector2i(other.cookingDuration) : null;
+        this.health = other.health != null ? new Vector2i(other.health) : null;
+    }
+
     public Recipe(CraftableType station) {
         this.station = station;
         this.ingredients = new IngredientInfo[0];
@@ -360,6 +373,7 @@ public class Recipe {
         Vector2i duration = getDuration(durationModifier);
 
         return new CraftingResult(
+                new Recipe(this),
                 this.getType(),
                 possibleValues.stream().filter(value -> value.range().low() != 0 || value.range().high() != 0).toList(),
                 requirements,

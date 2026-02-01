@@ -7,10 +7,16 @@ import com.wynntils.handlers.tooltip.type.TooltipWeightDecorator;
 import com.wynntils.models.character.type.ClassType;
 import com.wynntils.models.gear.type.GearTier;
 import com.wynntils.models.gear.type.ItemWeightSource;
+import com.wynntils.models.ingredients.type.IngredientInfo;
 import com.wynntils.models.items.WynnItem;
+import com.wynntils.models.items.items.game.CraftedGearItem;
 import com.wynntils.models.items.items.game.GearItem;
+import com.wynntils.models.items.properties.CraftedItemProperty;
+import com.wynntils.utils.mc.KeyboardUtils;
 import com.wynntils.utils.mc.TooltipUtils;
 import julianh06.wynnextras.config.WynnExtrasConfig;
+import julianh06.wynnextras.features.crafting.CraftingResult;
+import julianh06.wynnextras.features.crafting.Reverser;
 import julianh06.wynnextras.features.inventory.WeightDisplay;
 import julianh06.wynnextras.utils.CraftingUtils;
 import julianh06.wynnextras.utils.ItemUtils;
@@ -24,6 +30,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.List;
+import java.util.Set;
 
 @Mixin(value = TooltipUtils.class, remap = false)
 public class TooltipUtilsMixin {
@@ -86,7 +93,7 @@ public class TooltipUtilsMixin {
                     target = "Lcom/wynntils/handlers/tooltip/TooltipBuilder;getTooltipLines(Lcom/wynntils/models/character/type/ClassType;Lcom/wynntils/handlers/tooltip/type/TooltipStyle;Lcom/wynntils/handlers/tooltip/type/TooltipIdentificationDecorator;Lcom/wynntils/models/gear/type/ItemWeightSource;Lcom/wynntils/handlers/tooltip/type/TooltipWeightDecorator;)Ljava/util/List;"
             )
     )
-    private static List<Text> injectDecorator(
+    private static List<Text> injectCraftedDecorator(
             TooltipBuilder instance,
             ClassType currentClass,
             TooltipStyle style,
@@ -97,6 +104,27 @@ public class TooltipUtilsMixin {
 
         TooltipIdentificationDecorator decorator = CraftingUtils.getDecorator();
         return instance.getTooltipLines(currentClass, style, decorator, weightSource, weightDecorator);
+    }
+
+    // add recipe as footer if we know it
+    @Inject(method = "getCraftedItemTooltip", at = @At("RETURN"), cancellable = true)
+    private static void injectCraftedRecipe(ItemStack itemStack, WynnItem wynnItem, CraftedItemProperty craftedItemProperty, CallbackInfoReturnable<List<Text>> cir) {
+        List<Text> tooltip = cir.getReturnValue();
+
+        // TODO config
+        if (wynnItem instanceof CraftedGearItem craftedItem) {
+            Set<CraftingResult> knownRecipe = new Reverser(craftedItem).getKnownRecipe();
+            if (knownRecipe == null || knownRecipe.isEmpty()) return;
+            for (CraftingResult result : knownRecipe) {
+                tooltip.add(Text.of(""));
+                tooltip.add(Text.of("Recipe: "));
+                for (IngredientInfo ing : result.recipe().getIngredients()) {
+                    tooltip.add(Text.of("   " + ing.name()));
+                }
+            }
+
+            cir.setReturnValue(tooltip);
+        }
     }
 }
 

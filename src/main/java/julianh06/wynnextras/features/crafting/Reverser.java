@@ -46,6 +46,16 @@ public class Reverser {
         }
     }
 
+    public Set<CraftingResult> getKnownRecipe() {
+
+        System.out.println("getting " + hashable.getName() + " " + hashable.hashCode());
+        for (HashableCraftedGearItem hash : knownRecipes.keySet()) {
+            System.out.println("existing " + hash.getName() + " " + hash.hashCode() + " x" + knownRecipes.get(hash).size());
+        }
+
+        return knownRecipes.get(hashable);
+    }
+
     public Set<CraftingResult> getRecipe() {
         Set<CraftingResult> knowResult = knownRecipes.get(hashable);
         if (knowResult != null) return knowResult;
@@ -131,7 +141,7 @@ public class Reverser {
         }
 
         if (possibleMaterialData.isEmpty()) {
-            //System.err.println("No Recipe data found!");
+            System.err.println("No Recipe data found!");
             return Collections.emptySet();
         }
 

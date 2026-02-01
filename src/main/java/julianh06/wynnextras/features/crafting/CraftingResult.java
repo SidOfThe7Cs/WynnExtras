@@ -17,10 +17,18 @@ import org.joml.Vector4i;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public record CraftingResult(CraftableType type, List<StatPossibleValues> possibleValues, GearRequirements requirements,
-                             RangedValue health, RangedValue durability, Integer powderSlots, Integer charges,
-                             RangedValue duration, Map<DamageType, Vector4i> damage) {
-
+public record CraftingResult(
+        Recipe recipe,
+        CraftableType type,
+        List<StatPossibleValues> possibleValues,
+        GearRequirements requirements,
+        RangedValue health,
+        RangedValue durability,
+        Integer powderSlots,
+        Integer charges,
+        RangedValue duration,
+        Map<DamageType, Vector4i> damage
+) {
     public List<Text> getTooltip() {
         List<Text> tooltip = new ArrayList<>();
         tooltip.add(Text.literal("Crafting " + type.getDisplayName()).formatted(Formatting.DARK_AQUA));
