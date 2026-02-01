@@ -1,14 +1,12 @@
-package julianh06.wynnextras.mixin;
+package julianh06.wynnextras.mixin.TooltipMixins;
 
 import com.wynntils.features.tooltips.TooltipFittingFeature;
 import com.wynntils.models.gear.type.GearTier;
-import com.wynntils.models.items.WynnItem;
 import com.wynntils.utils.mc.TooltipUtils;
 import julianh06.wynnextras.config.WynnExtrasConfig;
 import julianh06.wynnextras.features.inventory.WeightDisplay;
 import julianh06.wynnextras.utils.ItemUtils;
 import net.minecraft.client.gui.tooltip.TooltipComponent;
-import net.minecraft.item.ItemStack;
 import net.minecraft.text.Text;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;

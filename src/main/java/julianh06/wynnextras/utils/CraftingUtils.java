@@ -1,16 +1,23 @@
 package julianh06.wynnextras.utils;
 
+import com.wynntils.core.components.Managers;
 import com.wynntils.core.components.Models;
+import com.wynntils.features.tooltips.ItemStatInfoFeature;
+import com.wynntils.handlers.tooltip.type.TooltipIdentificationDecorator;
 import com.wynntils.models.elements.type.Skill;
 import com.wynntils.models.gear.type.GearRequirements;
 import com.wynntils.models.ingredients.type.IngredientInfo;
 import com.wynntils.models.stats.type.StatPossibleValues;
+import com.wynntils.utils.mc.KeyboardUtils;
 import com.wynntils.utils.type.Pair;
 import com.wynntils.utils.type.RangedValue;
+import julianh06.wynnextras.features.crafting.data.IngredientItemMaps;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class CraftingUtils {
@@ -132,5 +139,53 @@ public class CraftingUtils {
                 newReqs,
                 value.quest()
         );
+    }
+
+    public static <T> void generateCombinations(
+            List<T> ings,
+            boolean duplicates,
+            boolean permute,
+            int startIdx,
+            int slots,
+            List<T> current,
+            Set<List<T>> result,
+            Set<Integer> usedIndices,
+            Function<List<T>, String> toKey,
+            Set<String> seen
+    ) {
+        String key = toKey.apply(current);
+        if (!seen.add(key)) return;
+
+        if (current.size() == slots) {
+            result.add(new ArrayList<>(current));
+            return;
+        }
+
+        int start = permute ? 0 : startIdx;
+        for (int i = start; i < ings.size(); i++) {
+            if (!duplicates && usedIndices.contains(i)) {
+                continue;
+            }
+
+            current.add(ings.get(i));
+            usedIndices.add(i);
+            int newStart = permute ? 0 : duplicates ? i : i + 1;
+            generateCombinations(ings, duplicates, permute, newStart, slots, current, result, usedIndices, toKey, seen);
+            current.removeLast();
+            usedIndices.remove(i);
+        }
+    }
+
+    public static String getIngListKey(List<IngredientItemMaps> recipe) {
+        return recipe.stream()
+                .map(ing -> ing == null ? "null" : ing.getIngredientInfo().name())
+                .collect(Collectors.joining(","));
+    }
+
+    // everything has private access its annoying so im just checking keyboard
+    public static TooltipIdentificationDecorator getDecorator() {
+        ItemStatInfoFeature feature = Managers.Feature.getFeatureInstance(ItemStatInfoFeature.class);
+        // ctr is roll chances and ctr+shift is internal roll neither of which we want on crafted
+        return feature.identificationDecorations.get() && !KeyboardUtils.isControlDown() ? feature.getIdentificationDecorator() : null;
     }
 }

@@ -201,6 +201,7 @@ public class Recipe {
     }
 
     private static final Map<Pair<Integer, CraftableType>, Double> allMaterialMultipliers = new HashMap<>();
+
     static {
         allMaterialMultipliers.put(new Pair<>(11, CraftableType.NECKLACE), 1.0);
         allMaterialMultipliers.put(new Pair<>(11, CraftableType.SCROLL), 1.0);
@@ -222,7 +223,7 @@ public class Recipe {
         allMaterialMultipliers.put(new Pair<>(21, CraftableType.RING), 1.125);
         allMaterialMultipliers.put(new Pair<>(21, null), 5.0 / 3.0);
 
-        allMaterialMultipliers.put(new Pair<>(22, CraftableType.NECKLACE),1.25);
+        allMaterialMultipliers.put(new Pair<>(22, CraftableType.NECKLACE), 1.25);
         allMaterialMultipliers.put(new Pair<>(22, CraftableType.SCROLL), 1.25);
         allMaterialMultipliers.put(new Pair<>(22, CraftableType.RING), 1.25);
         allMaterialMultipliers.put(new Pair<>(22, null), 1.25);
@@ -337,7 +338,7 @@ public class Recipe {
             double multiplier = metaMultipliers[i];
             if (ing.variableStats() != null) {
                 for (com.wynntils.utils.type.Pair<StatType, RangedValue> entry : ing.variableStats()) {
-                    StatPossibleValues idData = new StatPossibleValues(entry.key(), entry.value(), entry.value().high(), true);
+                    StatPossibleValues idData = new StatPossibleValues(entry.key(), entry.value(), 0, true);
                     StatPossibleValues scaled = applyMultiplier(idData, multiplier);
                     addIds(possibleValues, scaled);
                 }

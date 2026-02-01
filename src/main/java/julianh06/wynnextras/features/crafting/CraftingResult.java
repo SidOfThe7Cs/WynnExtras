@@ -4,7 +4,6 @@ import com.wynntils.models.elements.type.Skill;
 import com.wynntils.models.gear.type.GearRequirements;
 import com.wynntils.models.items.items.game.CraftedGearItem;
 import com.wynntils.models.stats.type.DamageType;
-import com.wynntils.models.stats.type.StatActualValue;
 import com.wynntils.models.stats.type.StatPossibleValues;
 import com.wynntils.models.stats.type.StatType;
 import com.wynntils.utils.type.Pair;
@@ -145,33 +144,42 @@ public record CraftingResult(CraftableType type, List<StatPossibleValues> possib
         return result;
     }
 
+    /*
+    public static List<Text> modifyTooltip(List<Text> tooltips, ItemStack itemStack, CraftedGearItem crafted) {
+        if (!tooltips.isEmpty()) {
+
+        }
+    }
+
+     */
+
     public boolean equalsIgnoreDurability(CraftedGearItem targetItem, boolean debug) {
         if (this.type != CraftableType.fromGearType(targetItem.getGearType())) {
-            if(debug) System.out.println("different type");
+            if (debug) System.out.println("different type");
             return false;
         }
 
-        List<StatActualValue> targetIds = targetItem.getIdentifications();
+        List<StatPossibleValues> targetIds = targetItem.getPossibleValues();
 
-        Set<StatType> targetTypes = targetIds.stream().map(StatActualValue::statType).collect(Collectors.toSet());
+        Set<StatType> targetTypes = targetIds.stream().map(StatPossibleValues::statType).collect(Collectors.toSet());
         Set<StatType> thisTypes = possibleValues.stream().map(StatPossibleValues::statType).collect(Collectors.toSet());
         if (!targetTypes.equals(thisTypes)) return false;
 
         // Check each possible value against target
-        Map<StatType, Integer> targetMap = targetIds.stream().collect(Collectors.toMap(StatActualValue::statType, StatActualValue::value));
+        Map<StatType, Integer> targetMap = targetIds.stream().collect(Collectors.toMap(StatPossibleValues::statType, StatPossibleValues::baseValue));
         for (StatPossibleValues possible : possibleValues) {
             Integer target = targetMap.get(possible.statType());
             if (possible.range().low() == 0 && possible.range().high() == 0) continue;
             if (target == null || !possible.range().inRange(target)) {
-                if(debug) System.out.println("different id for " + possible + "\n" + target);
+                if (debug) System.out.println("different id for " + possible + "\n" + target);
                 return false;
             }
         }
 
-       if(requirementsMatch(targetItem.getRequirements(), this.requirements)) {
-           if(debug) System.out.println("different reqs\n" + targetItem.getRequirements() + "\n" + this.requirements);
-           return false;
-       }
+        if (requirementsMatch(targetItem.getRequirements(), this.requirements)) {
+            if (debug) System.out.println("different reqs\n" + targetItem.getRequirements() + "\n" + this.requirements);
+            return false;
+        }
 
        /*
        if(!this.health.inRange(targetItem.getHealth())) {
@@ -179,9 +187,51 @@ public record CraftingResult(CraftableType type, List<StatPossibleValues> possib
            return false;
        }
         */
-       List<Pair<DamageType, RangedValue>> damages = targetItem.getDamages(); // TODO
+        List<Pair<DamageType, RangedValue>> damages = targetItem.getDamages(); // TODO
 
         return true;
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        for (Text line : getTooltip()) {
+            sb.append(line.getString());
+        }
+        return sb.toString();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        CraftingResult that = (CraftingResult) o;
+
+        // Compare non-list fields first
+        if (type != that.type) return false;
+        if (!Objects.equals(powderSlots, that.powderSlots)) return false;
+        if (!Objects.equals(charges, that.charges)) return false;
+        if (!Objects.equals(health, that.health)) return false;
+        if (!Objects.equals(durability, that.durability)) return false;
+        if (!Objects.equals(duration, that.duration)) return false;
+        if (!Objects.equals(damage, that.damage)) return false;
+
+        // Compare requirements using custom matcher
+        if (!requirementsMatch(requirements, that.requirements)) return false;
+
+        // Compare possibleValues, filtering out zero ranges
+        List<StatPossibleValues> filteredThis = filterZeroStats(possibleValues);
+        List<StatPossibleValues> filteredThat = filterZeroStats(that.possibleValues);
+
+        return filteredThis.equals(filteredThat);
+    }
+
+    @Override
+    public int hashCode() {
+        List<StatPossibleValues> filtered = filterZeroStats(possibleValues);
+        return Objects.hash(type, filtered,
+                requirementsHash(requirements),
+                health, durability, powderSlots, charges, duration, damage);
     }
 
     public static boolean requirementsMatch(GearRequirements a, GearRequirements b) {
@@ -191,6 +241,24 @@ public record CraftingResult(CraftableType type, List<StatPossibleValues> possib
         Map<Skill, Integer> bSkills = filterNonZeroSkills(b.skills());
         if (!aSkills.equals(bSkills)) return false;
         return Objects.equals(a.quest(), b.quest());
+    }
+
+    private static int requirementsHash(GearRequirements req) {
+        if (req == null) return 0;
+        return Objects.hash(
+                req.level(),
+                req.classType(),
+                filterNonZeroSkills(req.skills()),
+                req.quest()
+        );
+    }
+
+    private static List<StatPossibleValues> filterZeroStats(List<StatPossibleValues> stats) {
+        if (stats == null) return List.of();
+        return stats.stream()
+                .filter(stat -> stat != null &&
+                        !(stat.range().low() == 0 && stat.range().high() == 0))
+                .collect(Collectors.toList());
     }
 
     private static Map<Skill, Integer> filterNonZeroSkills(List<Pair<Skill, Integer>> skills) {

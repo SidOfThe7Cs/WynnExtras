@@ -5,7 +5,7 @@ import com.wynntils.models.gear.type.GearRequirements;
 import com.wynntils.models.ingredients.type.IngredientInfo;
 import com.wynntils.models.items.items.game.CraftedGearItem;
 import com.wynntils.models.profession.type.ProfessionType;
-import com.wynntils.models.stats.type.StatActualValue;
+import com.wynntils.models.stats.type.StatPossibleValues;
 import com.wynntils.models.stats.type.StatType;
 import com.wynntils.utils.type.Pair;
 import com.wynntils.utils.type.RangedValue;
@@ -13,8 +13,6 @@ import julianh06.wynnextras.features.crafting.data.Constants;
 import julianh06.wynnextras.features.crafting.data.CraftableType;
 import julianh06.wynnextras.features.crafting.data.IngredientItemMaps;
 import julianh06.wynnextras.utils.CraftingUtils;
-import net.fabricmc.loader.impl.lib.sat4j.pb.tools.INegator;
-import net.minecraft.text.Text;
 import org.apache.commons.lang3.tuple.Triple;
 import org.joml.Vector2i;
 
@@ -23,12 +21,14 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class Reverser {
+    private static final Map<HashableCraftedGearItem, Set<CraftingResult>> knownRecipes = new HashMap<>();
 
     private final CraftedGearItem target;
     private final CraftableType targetType;
-    private final Set<List<IngredientItemMaps>> recipeOptions = new HashSet<>();
+    private Set<List<IngredientItemMaps>> recipeOptions = new HashSet<>();
+    private final HashableCraftedGearItem hashable;
 
-    private Recipe mutableRecipe;
+    private final Recipe mutableRecipe;
 
     // constants, lMatTier, sMatTier
     private final List<Triple<Constants.RecipeRange, Integer, Integer>> possibleMaterialData = new ArrayList<>();
@@ -36,6 +36,7 @@ public class Reverser {
 
     public Reverser(CraftedGearItem target) throws RuntimeException {
         this.target = target;
+        this.hashable = HashableCraftedGearItem.from(target);
         this.targetType = CraftableType.fromGearType(target.getGearType());
         if (targetType == null) {
             throw new RuntimeException("CraftableType not found " + target.getGearType());
@@ -45,13 +46,22 @@ public class Reverser {
         }
     }
 
-    public void getRecipe() {
+    public Set<CraftingResult> getRecipe() {
+        Set<CraftingResult> knowResult = knownRecipes.get(hashable);
+        if (knowResult != null) return knowResult;
+
+        if (target.getName().equals("Augmented Shirt of Courage")) {
+            System.out.println("Augmented Shirt of Courage");
+            System.out.println(target.getPossibleValues());
+            System.out.println(target.getIdentifications());
+        }
+
         // TODO check if we have -skill point reqs and 0 value ids
-        List<StatActualValue> targetIdentifications = target.getIdentifications();
+        List<StatPossibleValues> targetPossibleValues = target.getPossibleValues();
         GearRequirements targetRequirements = target.getRequirements();
         Set<Skill> skillPointTypes = targetRequirements.skills().stream().map(Pair::a).collect(Collectors.toSet());
         int targetHealth = target.getHealth();
-        Set<StatType> targetStatTypes = targetIdentifications.stream().map(StatActualValue::statType).collect(Collectors.toSet());
+        Set<StatType> targetStatTypes = targetPossibleValues.stream().map(StatPossibleValues::statType).collect(Collectors.toSet());
 
 
         Map<String, IngredientInfo> allIngs = CraftingUtils.getAllIngs();
@@ -82,7 +92,8 @@ public class Reverser {
 
             // filter out ings that contain skill reqs not on the item
             List<Pair<Skill, Integer>> ingReqs = info.skillRequirements();
-            if (!ingReqs.isEmpty() && !skillPointTypes.containsAll(ingReqs.stream().map(Pair::a).collect(Collectors.toSet()))) continue;
+            if (!ingReqs.isEmpty() && !skillPointTypes.containsAll(ingReqs.stream().map(Pair::a).collect(Collectors.toSet())))
+                continue;
 
             // filter out ings that contain ids not on the item
             List<Pair<StatType, RangedValue>> stats = info.variableStats();
@@ -110,62 +121,45 @@ public class Reverser {
                     mutableRecipe.setlMaterialTier(l);
                     mutableRecipe.setsMaterialTier(s);
                     Vector2i recipeHealth = mutableRecipe.getHealth();
-                    if (recipeHealth.x <= targetHealth && targetHealth <= recipeHealth.y) {
-                        possibleMaterialData.add(Triple.of(data, l, s));
+                    if (recipeHealth != null) {
+                        if (recipeHealth.x <= targetHealth && targetHealth <= recipeHealth.y) {
+                            possibleMaterialData.add(Triple.of(data, l, s));
+                        }
                     }
                 }
             }
         }
 
         if (possibleMaterialData.isEmpty()) {
-            System.err.println("No Recipe data found!");
-            return;
+            //System.err.println("No Recipe data found!");
+            return Collections.emptySet();
         }
 
         System.out.println("Found " + possibleMaterialData.size() + " Recipe data found");
         for (Map.Entry<StatType, Set<IngredientInfo>> Stat : validStats.entrySet()) {
-            System.out.println("Found " + Stat.getValue().size() + " ings with " + Stat.getKey().getDisplayName());
+            //System.out.println("Found " + Stat.getValue().size() + " ings with " + Stat.getKey().getDisplayName());
         }
         for (Map.Entry<Skill, Set<IngredientInfo>> Stat : validReqs.entrySet()) {
-            System.out.println("Found " + Stat.getValue().size() + " ings with " + Stat.getKey().getDisplayName());
+            //System.out.println("Found " + Stat.getValue().size() + " ings with " + Stat.getKey().getDisplayName());
         }
-        System.out.println(validDura.size() + " validDura ings");
-        System.out.println(validMetaIngs.size() + " validMetaIngs ings");
+        //System.out.println(validDura.size() + " validDura ings");
+        //System.out.println(validMetaIngs.size() + " validMetaIngs ings");
 
         for (Pair<Skill, Integer> req : targetRequirements.skills()) {
             if (req.b() == 0) continue;
             Set<IngredientInfo> ingOptions = validReqs.get(req.a());
             addNext(ingOptions, (existingIng) -> existingIng.getSkillRequirement(req.a()) != 0);
-            System.out.println("recipe option is now " + recipeOptions.size() + " after " + req.a().getDisplayName());
+            //System.out.println("recipe option is now " + recipeOptions.size() + " after " + req.a().getDisplayName());
         }
 
-        for (StatActualValue id : targetIdentifications) {
+        for (StatPossibleValues id : targetPossibleValues) {
             Set<IngredientInfo> ingOptions = validStats.get(id.statType());
-            if (id.value() == 0) continue;
+            if (id.baseValue() == 0) continue;
             addNext(ingOptions, (existingIng) -> existingIng.getIdentification(id.statType()) != null);
-            System.out.println("recipe option is now " + recipeOptions.size() + " after " + id.statType().getDisplayName());
+            //System.out.println("recipe option is now " + recipeOptions.size() + " after " + id.statType().getDisplayName());
         }
 
-        fillWith(allValid); // TODO contains duplicates?
-
-        List<String> testIngs = new ArrayList<>(List.of("Elephelk Trunk", "Cursed Wings", "Cursed Wings", "Enhanced Behaviour Microchip"));
-        Collections.sort(testIngs);
-        for (List<IngredientItemMaps> option : recipeOptions) {
-            if (option.size() != 4) continue;
-            List<String> names = new ArrayList<>();
-            for (IngredientItemMaps item : option) {
-                String name = item.getName();
-                names.add(name);
-            }
-            Collections.sort(names);
-            if (testIngs.equals(names)) {
-                System.out.println("found correct " + testIngs);
-            }
-        }
-        for (IngredientItemMaps metaIng : validMetaIngs) {
-            if (metaIng.getName().equals("Negative Rafflesia")) System.out.println("found Rafflesia " + metaIng);
-            if (metaIng.getName().equals("Decaying Heart")) System.out.println("found Heart " + metaIng);
-        }
+        fillWith(allValid);
 
         //checkAll();
 
@@ -180,15 +174,14 @@ public class Reverser {
             //if (recipeOption.size() == 6) System.out.println(recipeOption);
         }
 
-        recipeOptions.clear();
-        recipeOptions.addAll(allMetaCombinations);
+        recipeOptions = allMetaCombinations;
         System.out.println("recipe option is now " + recipeOptions.size() + " after permuting with meta ings");
 
-        List<CraftingResult> possibleRecipes = new ArrayList<>();
+        Set<CraftingResult> possibleRecipes = new HashSet<>();
         int duplicateCounter = 0;
         Set<String> seen = new HashSet<>();
         for (List<IngredientItemMaps> ingsList : recipeOptions) {
-            String key = getIngListKey(ingsList);
+            String key = CraftingUtils.getIngListKey(ingsList);
             if (!seen.add(key)) {
                 duplicateCounter++;
                 continue;
@@ -201,23 +194,27 @@ public class Reverser {
             CraftingResult result = mutableRecipe.craft();
             if (result.equalsIgnoreDurability(target, false)) {
                 for (IngredientInfo ing : mutableRecipe.getIngredients()) {
-                    System.out.println(ing.name());
+                    //System.out.println(ing.name());
                 }
-                System.out.println();
+                //System.out.println();
                 possibleRecipes.add(result);
             }
 
         }
 
         for (CraftingResult result : possibleRecipes) {
-            for (Text line : result.getTooltip()) {
-                System.out.println(line.getString());
-            }
-            System.out.println("\n");
+            //System.out.println(result.toString());
+            //System.out.println("\n");
         }
 
         System.out.println("found " + duplicateCounter + " duplicates");
-        System.out.println("found " +  possibleRecipes.size() + " recipe options");
+        System.out.println("found " + possibleRecipes.size() + " recipe options for " + target.getName() + "\n");
+
+        // add to know even if it fails so we dont continually retry on failures
+        knownRecipes.put(hashable, possibleRecipes);
+        if (!possibleRecipes.isEmpty()) {
+            return possibleRecipes;
+        } else return Collections.emptySet();
     }
 
     private void addNext(Set<IngredientInfo> ingOptions, Function<IngredientItemMaps, Boolean> checker) {
@@ -285,8 +282,7 @@ public class Reverser {
             }
         }
 
-        recipeOptions.clear();
-        recipeOptions.addAll(results);
+        recipeOptions = results;
     }
 
 
@@ -331,19 +327,14 @@ public class Reverser {
             }
         }
 
-        for (StatActualValue targetId : target.getIdentifications()) {
+        for (StatPossibleValues targetId : target.getPossibleValues()) {
             RangedValue givenId = totalIds.get(targetId.statType());
             if (givenId == null) return true;
-            if (!givenId.inRange(targetId.value())) return true;
+            if (!givenId.inRange(targetId.baseValue())) return true;
         }
 
         return false;
     }
-
-    //TODO change it so that it gets the ing with the highest high for each stat
-    // and then finds the multiplier to reach target
-    // and then condenses so that if a single ing has the highest value for multiple stats its multiplier is only counted once
-    // and then have variables for the highest multiplier and the total multiplier (after condencing)
 
     // TODO flip for negative
     private boolean shouldTrim(List<IngredientItemMaps> ingredients) {
@@ -370,9 +361,9 @@ public class Reverser {
         Map<StatType, Double> statMultipliers = new HashMap<>();
         Map<IngredientItemMaps, List<StatType>> ingToStats = new HashMap<>();
 
-        for (StatActualValue targetId : target.getIdentifications()) {
+        for (StatPossibleValues targetId : target.getPossibleValues()) {
             StatType statType = targetId.statType();
-            double targetValue = targetId.value();
+            double targetValue = targetId.baseValue();
 
             Pair<IngredientItemMaps, Double> bestPair = bestIngForStat.get(statType);
             if (bestPair == null) return true;
@@ -429,7 +420,7 @@ public class Reverser {
         }
 
         Set<List<IngredientItemMaps>> allOrdersForProvided = new HashSet<>();
-        generateCombinations(paddedIngredients, false, true, 0, 6, new ArrayList<>(), allOrdersForProvided, new HashSet<>(), Reverser::getIngListKey, new HashSet<>());
+        CraftingUtils.generateCombinations(paddedIngredients, false, true, 0, 6, new ArrayList<>(), allOrdersForProvided, new HashSet<>(), CraftingUtils::getIngListKey, new HashSet<>());
 
         Set<List<IngredientItemMaps>> results = new HashSet<>();
 
@@ -441,15 +432,15 @@ public class Reverser {
                     nullCount,
                     k -> {
                         Set<List<IngredientItemMaps>> result = new HashSet<>();
-                        generateCombinations(validMetaIngs, true, true, 0, k, new ArrayList<>(), result, new HashSet<>(), Reverser::getIngListKey, new HashSet<>());
+                        CraftingUtils.generateCombinations(validMetaIngs, true, true, 0, k, new ArrayList<>(), result, new HashSet<>(), CraftingUtils::getIngListKey, new HashSet<>());
                         return result;
                     }
             );
 
             for (List<IngredientItemMaps> metaIngs : metaCombination) {
-                if (metaIngs.size() != nullCount){
+                if (metaIngs.size() != nullCount) {
                     System.out.println("i messed up down here");
-                    return  Collections.emptySet();
+                    return Collections.emptySet();
                 }
 
                 List<IngredientItemMaps> result = new ArrayList<>(ordered);
@@ -473,44 +464,4 @@ public class Reverser {
         return results;
     }
 
-    private static <T> void generateCombinations(
-            List<T> ings,
-            boolean duplicates,
-            boolean permute,
-            int startIdx,
-            int slots,
-            List<T> current,
-            Set<List<T>> result,
-            Set<Integer> usedIndices,
-            Function<List<T>, String> toKey,
-            Set<String> seen
-    ) {
-        String key = toKey.apply(current);
-        if (!seen.add(key)) return;
-
-        if (current.size() == slots) {
-            result.add(new ArrayList<>(current));
-            return;
-        }
-
-        int start = permute ? 0 : startIdx;
-        for (int i = start; i < ings.size(); i++) {
-            if (!duplicates && usedIndices.contains(i)) {
-                continue;
-            }
-
-            current.add(ings.get(i));
-            usedIndices.add(i);
-            int newStart = permute ? 0 : duplicates ? i : i + 1;
-            generateCombinations(ings, duplicates, permute, newStart, slots, current, result, usedIndices, toKey, seen);
-            current.removeLast();
-            usedIndices.remove(i);
-        }
-    }
-
-    private static String getIngListKey(List<IngredientItemMaps> recipe) {
-        return recipe.stream()
-                .map(ing -> ing == null ? "null" : ing.getIngredientInfo().name())
-                .collect(Collectors.joining(","));
-    }
 }
