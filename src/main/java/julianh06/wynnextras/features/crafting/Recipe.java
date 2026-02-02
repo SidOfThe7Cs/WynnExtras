@@ -7,7 +7,6 @@ import com.wynntils.models.stats.type.DamageType;
 import com.wynntils.models.stats.type.StatPossibleValues;
 import com.wynntils.models.stats.type.StatType;
 import com.wynntils.utils.type.RangedValue;
-import julianh06.wynnextras.features.crafting.data.Constants;
 import julianh06.wynnextras.features.crafting.data.CraftableType;
 import julianh06.wynnextras.features.crafting.data.recipes.RecipeLoader;
 import julianh06.wynnextras.features.crafting.data.IngredientItemMaps;
@@ -123,10 +122,6 @@ public class Recipe {
         this.healthOrDmg = data.healthOrDamage();
     }
 
-    public void setIngredients(IngredientInfo[] ingredients) {
-        this.ingredients = ingredients;
-    }
-
     public void setIngredients(List<IngredientItemMaps> ingredients) {
         if (ingredients.size() > 6) {
             System.out.println("cannot set recipe to more than 6 ingredients");
@@ -143,41 +138,6 @@ public class Recipe {
         }
 
         this.ingredients = result;
-    }
-
-    public void setFromTriple(Triple<Constants.RecipeRange, Integer, Integer> data) {
-        setlMaterialTier(data.getMiddle());
-        setsMaterialTier(data.getRight());
-        setConstants(data.getLeft());
-    }
-
-    public void setsMaterialTier(int sMaterialTier) {
-        this.sMaterialTier = sMaterialTier;
-    }
-
-    public void setlMaterialTier(int lMaterialTier) {
-        this.lMaterialTier = lMaterialTier;
-    }
-
-    public void setLevel(Vector2i level) {
-        this.level = level;
-        Constants.RecipeRange ranges = Constants.getByLevel(this.level);
-        if (ranges == null) {
-            System.err.println("cannot set recipe to level " + this.level + " no constant found");
-            return;
-        }
-        this.durability = ranges.durability();
-        this.consuDuration = ranges.consuDuration();
-        this.cookingDuration = ranges.cookingDuration();
-        this.health = ranges.health();
-    }
-
-    public void setConstants(Constants.RecipeRange data) {
-        this.level = data.level();
-        this.durability = data.durability();
-        this.consuDuration = data.consuDuration();
-        this.cookingDuration = data.cookingDuration();
-        this.health = data.health();
     }
 
     public IngredientInfo[] getIngredients() {

@@ -12,6 +12,7 @@ import com.wynntils.utils.mc.KeyboardUtils;
 import com.wynntils.utils.type.Pair;
 import com.wynntils.utils.type.RangedValue;
 import julianh06.wynnextras.features.crafting.data.IngredientItemMaps;
+import org.joml.Vector2i;
 
 import java.util.*;
 import java.util.function.Function;
@@ -57,7 +58,7 @@ public class CraftingUtils {
     public static List<Pair<Skill, Integer>> applyMultiplier(List<Pair<Skill, Integer>> list, Double multiplier) {
         List<Pair<Skill, Integer>> result = new ArrayList<>();
         for (Pair<Skill, Integer> pair : list) {
-            int newValue = (int) Math.round(pair.b() * multiplier);
+            int newValue = (int) Math.floor(pair.b() * multiplier);
             result.add(new Pair<>(pair.a(), newValue));
         }
         return result;
@@ -184,5 +185,30 @@ public class CraftingUtils {
         ItemStatInfoFeature feature = Managers.Feature.getFeatureInstance(ItemStatInfoFeature.class);
         // ctr is roll chances and ctr+shift is internal roll neither of which we want on crafted
         return feature.identificationDecorations.get() && !KeyboardUtils.isControlDown() ? feature.getIdentificationDecorator() : null;
+    }
+
+    public static Set<Vector2i> levelToRanges(int level) {
+        Set<Vector2i> ranges = new HashSet<>();
+
+        if (level < 99 && level > 1) {
+            int lowerStart = ((level - 1) / 2) * 2 + 1;
+            ranges.add(new Vector2i(lowerStart, lowerStart + 2));
+
+            if (level % 2 == 1) {
+                ranges.add(new Vector2i(lowerStart - 2, lowerStart));
+            }
+        } else switch (level) { // TODO fruma
+            case 1: ranges.add(new Vector2i(1, 3)); break;
+            case 99: ranges.add(new Vector2i(97, 99)); break;
+            case 100, 101, 102: ranges.add(new Vector2i(100, 103)); break;
+            case 103: {
+                ranges.add(new Vector2i(100, 103));
+                ranges.add(new Vector2i(103, 105));
+                break;
+            }
+            case 104, 105: ranges.add(new Vector2i(103, 105)); break;
+        }
+
+        return ranges;
     }
 }

@@ -9,9 +9,9 @@ import com.wynntils.models.stats.type.StatPossibleValues;
 import com.wynntils.models.stats.type.StatType;
 import com.wynntils.utils.type.Pair;
 import com.wynntils.utils.type.RangedValue;
-import julianh06.wynnextras.features.crafting.data.Constants;
 import julianh06.wynnextras.features.crafting.data.CraftableType;
 import julianh06.wynnextras.features.crafting.data.IngredientItemMaps;
+import julianh06.wynnextras.features.crafting.data.recipes.RecipeLoader;
 import julianh06.wynnextras.utils.CraftingUtils;
 import org.apache.commons.lang3.tuple.Triple;
 import org.joml.Vector2i;
@@ -31,8 +31,8 @@ public class Reverser {
     private final Recipe mutableRecipe;
 
     // constants, lMatTier, sMatTier
-    private final List<Triple<Constants.RecipeRange, Integer, Integer>> possibleMaterialData = new ArrayList<>();
-    private final List<Constants.RecipeRange> possibleConstantData;
+    private final List<Triple<RecipeLoader.RecipeData, Integer, Integer>> possibleMaterialData = new ArrayList<>();
+    private final Set<RecipeLoader.RecipeData> possibleConstantData;
 
     public Reverser(CraftedGearItem target) throws RuntimeException {
         this.target = target;
@@ -42,7 +42,7 @@ public class Reverser {
             throw new RuntimeException("CraftableType not found " + target.getGearType());
         } else {
             mutableRecipe = new Recipe(targetType);
-            possibleConstantData = Constants.getByLevel(target.getRequirements().level());
+            possibleConstantData = RecipeLoader.getPossibleRecipes(targetType, target.getRequirements().level());
         }
     }
 
@@ -53,6 +53,8 @@ public class Reverser {
     public Set<CraftingResult> getRecipe() {
         Set<CraftingResult> knowResult = knownRecipes.get(hashable);
         if (knowResult != null) return knowResult;
+
+        if (!target.getName().contains("Helmet")) return Collections.emptySet(); // TODO remove
 
         // TODO check if we have -skill point reqs and 0 value ids
         List<StatPossibleValues> targetPossibleValues = target.getPossibleValues();
@@ -113,7 +115,7 @@ public class Reverser {
         }
 
         // TODO move to after found ings and test dura
-        for (Constants.RecipeRange data : possibleConstantData) {
+        for (RecipeLoader.RecipeData data : possibleConstantData) {
             mutableRecipe.setConstants(data);
             for (int l = 1; l <= 3; l++) {
                 for (int s = 1; s <= 3; s++) {
@@ -292,7 +294,7 @@ public class Reverser {
         //IngredientItemMaps bestDura = new IngredientItemMaps(CraftingUtils.getIng("Elephelk Trunk")); // TODO method
 
         Set<List<IngredientItemMaps>> toRemove = new HashSet<>();
-        for (Triple<Constants.RecipeRange, Integer, Integer> possibility : possibleMaterialData) {
+        for (Triple<RecipeLoader.RecipeData, Integer, Integer> possibility : possibleMaterialData) {
             mutableRecipe.setFromTriple(possibility);
             for (List<IngredientItemMaps> currentRecipe : recipeOptions) {
                 List<IngredientItemMaps> copy = new ArrayList<>(currentRecipe);

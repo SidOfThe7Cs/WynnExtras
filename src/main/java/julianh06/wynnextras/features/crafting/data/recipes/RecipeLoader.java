@@ -3,6 +3,7 @@ package julianh06.wynnextras.features.crafting.data.recipes;
 import com.google.gson.*;
 import com.wynntils.models.profession.type.ProfessionType;
 import julianh06.wynnextras.features.crafting.data.CraftableType;
+import julianh06.wynnextras.utils.CraftingUtils;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Vector2i;
 
@@ -11,9 +12,7 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -27,6 +26,21 @@ public class RecipeLoader {
             return null;
         }
         return allTypeDataMap.get(lvl);
+    }
+
+    public static Set<RecipeData> getPossibleRecipes(CraftableType type, int lvl) {
+        Map<Vector2i, RecipeData> allTypeDataMap = recipes.get(type);
+        if (allTypeDataMap == null) {
+            System.err.println("No recipe data found for type " + type);
+            return null;
+        }
+
+        Set<RecipeData> result = new HashSet<>();
+        Set<Vector2i> levelRanges = CraftingUtils.levelToRanges(lvl);
+        for (Vector2i level : levelRanges) {
+            result.add(allTypeDataMap.get(level));
+        }
+        return result;
     }
 
     public record RecipeData(
