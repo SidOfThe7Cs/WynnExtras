@@ -47,24 +47,12 @@ public class Reverser {
     }
 
     public Set<CraftingResult> getKnownRecipe() {
-
-        System.out.println("getting " + hashable.getName() + " " + hashable.hashCode());
-        for (HashableCraftedGearItem hash : knownRecipes.keySet()) {
-            System.out.println("existing " + hash.getName() + " " + hash.hashCode() + " x" + knownRecipes.get(hash).size());
-        }
-
         return knownRecipes.get(hashable);
     }
 
     public Set<CraftingResult> getRecipe() {
         Set<CraftingResult> knowResult = knownRecipes.get(hashable);
         if (knowResult != null) return knowResult;
-
-        if (target.getName().equals("Augmented Shirt of Courage")) {
-            System.out.println("Augmented Shirt of Courage");
-            System.out.println(target.getPossibleValues());
-            System.out.println(target.getIdentifications());
-        }
 
         // TODO check if we have -skill point reqs and 0 value ids
         List<StatPossibleValues> targetPossibleValues = target.getPossibleValues();
@@ -209,8 +197,8 @@ public class Reverser {
                 for (IngredientInfo ing : mutableRecipe.getIngredients()) {
                     //System.out.println(ing.name());
                 }
-                System.out.println("\nadding " + result);
-                System.out.println("hash " + result.hashCode());
+                //System.out.println("\nadding " + result);
+                //System.out.println("hash " + result.hashCode());
                 possibleRecipes.add(result);
             }
 

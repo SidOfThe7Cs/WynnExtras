@@ -13,10 +13,7 @@ import com.wynntils.utils.type.Pair;
 import com.wynntils.utils.type.RangedValue;
 import julianh06.wynnextras.features.crafting.data.IngredientItemMaps;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -105,9 +102,9 @@ public class CraftingUtils {
         if (value == null) {
             return new GearRequirements(
                     0,
-                    null,
+                    Optional.empty(),
                     toAddScaled,
-                    null
+                    Optional.empty()
             );
         }
 

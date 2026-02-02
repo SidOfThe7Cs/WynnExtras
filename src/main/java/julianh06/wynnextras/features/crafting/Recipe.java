@@ -286,6 +286,10 @@ public class Recipe {
             }
         }
 
+        for (int i = 0; i < multipliers.length; i++) {
+            multipliers[i] = Math.round(multipliers[i] * 100.0) / 100.0;
+        }
+
         this.multipliers = multipliers;
     }
 

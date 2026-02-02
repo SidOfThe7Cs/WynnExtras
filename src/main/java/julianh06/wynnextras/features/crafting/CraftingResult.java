@@ -181,12 +181,12 @@ public record CraftingResult(
             Integer target = targetMap.get(possible.statType());
             if (possible.range().low() == 0 && possible.range().high() == 0) continue;
             if (target == null || !possible.range().inRange(target)) {
-                if (debug) System.out.println("different id for " + possible + "\n" + target);
+                //if (debug) System.out.println("different id for " + possible + " target: " + target + "\n");
                 return false;
             }
         }
 
-        if (requirementsMatch(targetItem.getRequirements(), this.requirements)) {
+        if (!requirementsMatch(targetItem.getRequirements(), this.requirements, debug)) {
             if (debug) System.out.println("different reqs\n" + targetItem.getRequirements() + "\n" + this.requirements);
             return false;
         }
@@ -227,7 +227,7 @@ public record CraftingResult(
         if (!Objects.equals(damage, that.damage)) return false;
 
         // Compare requirements using custom matcher
-        if (!requirementsMatch(requirements, that.requirements)) return false;
+        if (!requirementsMatch(requirements, that.requirements, false)) return false;
 
         // Compare possibleValues, filtering out zero ranges
         Set<StatPossibleValues> filteredThis = filterZeroStats(possibleValues);
@@ -244,25 +244,30 @@ public record CraftingResult(
                 health, durability, powderSlots, charges, duration, damage);
     }
 
-    public static boolean requirementsMatch(GearRequirements a, GearRequirements b) {
-        Vector2i aLvl = new Vector2i(a.level() - 2, a.level());
-        Vector2i bLvl = new Vector2i(b.level() - 2, b.level());
-        if (!aLvl.equals(bLvl)) return false;
+    public static boolean requirementsMatch(GearRequirements a, GearRequirements b, boolean debug) {
+        //if (Math.abs(a.level() - b.level()) > 2) return false;
         if (!Objects.equals(a.classType(), b.classType())) return false;
         Map<Skill, Integer> aSkills = filterNonZeroSkills(a.skills());
         Map<Skill, Integer> bSkills = filterNonZeroSkills(b.skills());
-        return aSkills.equals(bSkills);
+        boolean skillsMatch = aSkills.equals(bSkills);
+        if (debug) {
+            System.out.println("aSkills: " + aSkills);
+            System.out.println("bSkills: " + bSkills);
+            System.out.println("skillsMatch: " + skillsMatch);
+        }
+        return skillsMatch;
     }
 
     private static int requirementsHash(GearRequirements req) {
         if (req == null) return 0;
         return Objects.hash(
-                new Vector2i(req.level() - 2, req.level()),
+                req.level(),
                 req.classType(),
                 filterNonZeroSkills(req.skills())
         );
     }
 
+    //TODO check if the recipe can pass through 0
     private static Set<StatPossibleValues> filterZeroStats(List<StatPossibleValues> stats) {
         if (stats == null) return Set.of();
         return stats.stream()
@@ -274,7 +279,7 @@ public record CraftingResult(
     private static Map<Skill, Integer> filterNonZeroSkills(List<Pair<Skill, Integer>> skills) {
         if (skills == null) return Map.of();
         return skills.stream()
-                .filter(pair -> pair != null && pair.b() != null && pair.b() > 0)
+                .filter(pair -> pair != null && pair.b() != null && pair.b() != 0)
                 .collect(Collectors.toMap(Pair::a, Pair::b));
     }
 }
