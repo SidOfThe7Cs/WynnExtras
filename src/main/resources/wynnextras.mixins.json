@@ -40,7 +40,6 @@
     "PressableWidgetMixin",
     "RaidKindAccessor",
     "ScreenHandlerMixin",
-    "TempIngPosModFix",
     "TerritoryInfoMixin",
     "Accessor.BannerBlockEntityAccessor",
     "Accessor.ChatHudAccessor",

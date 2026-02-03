@@ -5,7 +5,6 @@ import com.wynntils.core.components.Models;
 import com.wynntils.features.tooltips.ItemStatInfoFeature;
 import com.wynntils.handlers.tooltip.type.TooltipIdentificationDecorator;
 import com.wynntils.models.elements.type.Skill;
-import com.wynntils.models.gear.type.GearRequirements;
 import com.wynntils.models.ingredients.type.IngredientInfo;
 import com.wynntils.models.stats.type.StatPossibleValues;
 import com.wynntils.utils.mc.KeyboardUtils;
@@ -14,7 +13,10 @@ import com.wynntils.utils.type.RangedValue;
 import julianh06.wynnextras.features.crafting.data.IngredientItemMaps;
 import org.joml.Vector2i;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -55,10 +57,10 @@ public class CraftingUtils {
         return new StatPossibleValues(value.statType(), new RangedValue(min, max), raw, true);
     }
 
-    public static List<Pair<Skill, Integer>> applyMultiplier(List<Pair<Skill, Integer>> list, Double multiplier) {
-        List<Pair<Skill, Integer>> result = new ArrayList<>();
+    public static List<Pair<Skill, Double>> applyMultiplier(List<Pair<Skill, Integer>> list, Double multiplier) {
+        List<Pair<Skill, Double>> result = new ArrayList<>();
         for (Pair<Skill, Integer> pair : list) {
-            int newValue = (int) Math.floor(pair.b() * multiplier);
+            double newValue = pair.b() * multiplier;
             result.add(new Pair<>(pair.a(), newValue));
         }
         return result;
@@ -96,30 +98,25 @@ public class CraftingUtils {
         return range.low() + half;
     }
 
-    public static GearRequirements addGearRequirements(GearRequirements value, List<Pair<Skill, Integer>> toAdd, double multiplier) {
+    public static List<Pair<Skill, Double>> addGearRequirements(List<Pair<Skill, Double>> value, List<Pair<Skill, Integer>> toAdd, double multiplier) {
 
-        List<Pair<Skill, Integer>> toAddScaled = applyMultiplier(toAdd, multiplier);
+        List<Pair<Skill, Double>> toAddScaled = applyMultiplier(toAdd, multiplier);
 
         if (value == null) {
-            return new GearRequirements(
-                    0,
-                    Optional.empty(),
-                    toAddScaled,
-                    Optional.empty()
-            );
+            return toAddScaled;
         }
 
-        List<Pair<Skill, Integer>> newReqs = new ArrayList<>(value.skills());
+        List<Pair<Skill, Double>> newReqs = new ArrayList<>(value);
 
-        for (Pair<Skill, Integer> newReq : toAddScaled) {
+        for (Pair<Skill, Double> newReq : toAddScaled) {
             boolean found = false;
 
             // Check if this skill already has a requirement
             for (int i = 0; i < newReqs.size(); i++) {
-                Pair<Skill, Integer> existingReq = newReqs.get(i);
+                Pair<Skill, Double> existingReq = newReqs.get(i);
 
                 if (existingReq.a().equals(newReq.a())) {
-                    int newValue = existingReq.b() + newReq.b();
+                    double newValue = (double) existingReq.b() + newReq.b();
                     newReqs.set(i, new Pair<>(newReq.a(), newValue));
                     found = true;
                     break;
@@ -131,12 +128,7 @@ public class CraftingUtils {
             }
         }
 
-        return new GearRequirements(
-                value.level(),
-                value.classType(),
-                newReqs,
-                value.quest()
-        );
+        return newReqs;
     }
 
     public static <T> void generateCombinations(

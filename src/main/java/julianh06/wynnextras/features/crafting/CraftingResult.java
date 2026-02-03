@@ -1,5 +1,6 @@
 package julianh06.wynnextras.features.crafting;
 
+import com.wynntils.models.character.type.ClassType;
 import com.wynntils.models.elements.type.Skill;
 import com.wynntils.models.gear.type.GearRequirements;
 import com.wynntils.models.items.items.game.CraftedGearItem;
@@ -13,7 +14,6 @@ import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import org.jetbrains.annotations.NotNull;
-import org.joml.Vector2i;
 import org.joml.Vector4i;
 
 import java.util.*;
@@ -36,8 +36,8 @@ public record CraftingResult(
         tooltip.add(Text.literal("Crafting " + type.getDisplayName()).formatted(Formatting.DARK_AQUA));
         addBlank(tooltip);
 
-        if (type.isArmour()) {
-            addBaseFormat(tooltip, "Health", health);
+        if (health != null && type.canHaveHealth()) {
+            tooltip.add(Text.literal("Health: " + health.low() + "-" + health.high()).formatted(Formatting.RED));
             addBlank(tooltip);
         }
 
@@ -46,10 +46,8 @@ public record CraftingResult(
         }
 
         addReqs(tooltip);
-        addBlank(tooltip);
 
         addIds(tooltip);
-        addBlank(tooltip);
 
         if (type.isArmour()) {
             addBaseFormat(tooltip, "Powder Slots", powderSlots);
@@ -76,14 +74,25 @@ public record CraftingResult(
                     .append(String.valueOf(entry.getValue().w));
             tooltip.add(append);
         }
+        if (!damage.isEmpty()) {
+            addBlank(tooltip);
+        }
     }
 
     public void addReqs(List<Text> tooltip) {
+        if (requirements.classType().isPresent() && requirements.classType().get() != ClassType.NONE) {
+            MutableText suffix = Text.literal(
+                    requirements.classType().get().getActualName(false) + "/" +
+                            requirements.classType().get().getActualName(true)
+            );
+            tooltip.add(Text.literal("Class Req: ").append(suffix));
+        }
         addBaseFormat(tooltip, "Combat Level Min", new RangedValue(requirements.level() - 2, requirements.level()));
         for (Pair<Skill, Integer> req : requirements.skills()) {
             String name = req.a().name().charAt(0) + req.a().name().substring(1).toLowerCase();
             addBaseFormat(tooltip, name + " Min", req.b());
         }
+        addBlank(tooltip);
     }
 
     private void addIds(List<Text> tooltip) {
@@ -104,6 +113,9 @@ public record CraftingResult(
                     .append(applyElementFormatting(id.statType().getDisplayName()))
                     .append(unit).append(": ")
                     .append(highText));
+        }
+        if (!possibleValues.isEmpty()) {
+            addBlank(tooltip);
         }
     }
 
@@ -199,6 +211,21 @@ public record CraftingResult(
         List<Pair<DamageType, RangedValue>> damages = targetItem.getDamages(); // TODO
 
         return true;
+    }
+
+    public String getAllInfoString() {
+        return "Recipe{" +
+                "recipe=" + recipe +
+                ", type=" + type +
+                ", possibleValues=" + possibleValues +
+                ", requirements=" + requirements +
+                ", health=" + health +
+                ", durability=" + durability +
+                ", powderSlots=" + powderSlots +
+                ", charges=" + charges +
+                ", duration=" + duration +
+                ", damage=" + damage +
+                '}';
     }
 
     @Override
