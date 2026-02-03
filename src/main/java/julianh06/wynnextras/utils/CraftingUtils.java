@@ -13,10 +13,7 @@ import com.wynntils.utils.type.RangedValue;
 import julianh06.wynnextras.features.crafting.data.IngredientItemMaps;
 import org.joml.Vector2i;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 

@@ -74,8 +74,16 @@ public class RecipeLoader {
         }
 
         public static class Material {
-            String item;
-            int amount;
+            private String item;
+            private int amount;
+
+            public String getItem() {
+                return item;
+            }
+
+            public int getAmount() {
+                return amount;
+            }
 
             @Override
             public String toString() {

@@ -13,7 +13,6 @@ import julianh06.wynnextras.features.crafting.data.CraftableType;
 import julianh06.wynnextras.features.crafting.data.IngredientItemMaps;
 import julianh06.wynnextras.features.crafting.data.recipes.RecipeLoader;
 import julianh06.wynnextras.utils.CraftingUtils;
-import org.apache.commons.lang3.tuple.Triple;
 import org.joml.Vector2i;
 
 import java.util.*;
@@ -30,8 +29,7 @@ public class Reverser {
 
     private final Recipe mutableRecipe;
 
-    // constants, lMatTier, sMatTier
-    private final List<Triple<RecipeLoader.RecipeData, Integer, Integer>> possibleMaterialData = new ArrayList<>();
+    private final List<Pair<RecipeLoader.RecipeData, Recipe.Materials>> possibleMaterialData = new ArrayList<>();
     private final Set<RecipeLoader.RecipeData> possibleConstantData;
 
     public Reverser(CraftedGearItem target) throws RuntimeException {
@@ -54,9 +52,9 @@ public class Reverser {
         Set<CraftingResult> knowResult = knownRecipes.get(hashable);
         if (knowResult != null) return knowResult;
 
-        if (!target.getName().contains("Helmet")) return Collections.emptySet(); // TODO remove
+        //if (!target.getName().contains("Helmet")) return Collections.emptySet(); // TODO remove
 
-        // TODO check if we have -skill point reqs and 0 value ids
+        // TODO check if we have -skill point reqs and 0 value ids (we have -req but not 0value ids) what about 0 reqs?
         List<StatPossibleValues> targetPossibleValues = target.getPossibleValues();
         GearRequirements targetRequirements = target.getRequirements();
         Set<Skill> skillPointTypes = targetRequirements.skills().stream().map(Pair::a).collect(Collectors.toSet());
@@ -79,31 +77,37 @@ public class Reverser {
 
         Set<IngredientItemMaps> validMetaIngs = new HashSet<>();
 
+        // add all ings to different maps
+        int maxLvl = possibleConstantData.stream().map(RecipeLoader.RecipeData::lvl).mapToInt(Vector2i::y).max().orElse(0);
         for (IngredientInfo info : allIngs.values()) {
-            // filter out ingredient without the used profession
+            // check used profession
             List<ProfessionType> professions = info.professions();
             if (!professions.contains(targetType.getStation())) continue;
 
+            // check level
+            if (info.level() > maxLvl) continue;
+
             allDura.add(info);
 
+            // TODO includes all meta ings need to check special case of -100 effectivness
             if (!info.positionModifiers().isEmpty()) {
                 validMetaIngs.add(new IngredientItemMaps(info));
             }
 
+            // TODO somehow handle when an ing rolls 0 and an id that can not be 0
             // filter out ings that contain skill reqs not on the item
             List<Pair<Skill, Integer>> ingReqs = info.skillRequirements();
             if (!ingReqs.isEmpty() && !skillPointTypes.containsAll(ingReqs.stream().map(Pair::a).collect(Collectors.toSet())))
                 continue;
-
             // filter out ings that contain ids not on the item
             List<Pair<StatType, RangedValue>> stats = info.variableStats();
             if (!targetStatTypes.containsAll(stats.stream().map(Pair::a).collect(Collectors.toSet()))) continue;
 
+            // map by stat/skill
             for (Pair<StatType, RangedValue> stat : stats) {
                 Set<IngredientInfo> statSet = validStats.computeIfAbsent(stat.a(), k -> new HashSet<>());
                 statSet.add(info);
             }
-
             for (Pair<Skill, Integer> skillReq : ingReqs) {
                 Set<IngredientInfo> reqSet = validReqs.computeIfAbsent(skillReq.a(), k -> new HashSet<>());
                 reqSet.add(info);
@@ -111,24 +115,23 @@ public class Reverser {
 
             if (info.positionModifiers().isEmpty()) allValid.add(info);
 
-            validDura.add(info);
+            if (info.durabilityModifier() > 0) validDura.add(info);
         }
 
-        // TODO move to after found ings and test dura
+        // TODO move to after found ings and test dura this only matter at the end whatever
         for (RecipeLoader.RecipeData data : possibleConstantData) {
             mutableRecipe.setConstants(data);
             for (int l = 1; l <= 3; l++) {
                 for (int s = 1; s <= 3; s++) {
-                    mutableRecipe.setlMaterialTier(l);
-                    mutableRecipe.setsMaterialTier(s);
+                    mutableRecipe.getMaterials().setMat1Tier(l);
+                    mutableRecipe.getMaterials().setMat2Tier(s);
                     Vector2i recipeHealth = mutableRecipe.getHealth();
-                    possibleMaterialData.add(Triple.of(data, l, s));
 
-                    if (recipeHealth != null) {
+                    if (targetType.isArmour()) {
                         if (recipeHealth.x <= targetHealth && targetHealth <= recipeHealth.y) {
-                            //possibleMaterialData.add(Triple.of(data, l, s));
+                            possibleMaterialData.add(new Pair<>(data, new Recipe.Materials(mutableRecipe.getMaterials())));
                         }
-                    }
+                    } else possibleMaterialData.add(new Pair<>(data, new Recipe.Materials(mutableRecipe.getMaterials())));
                 }
             }
         }
@@ -148,6 +151,7 @@ public class Reverser {
         //System.out.println(validDura.size() + " validDura ings");
         //System.out.println(validMetaIngs.size() + " validMetaIngs ings");
 
+        // add at least one of every req
         for (Pair<Skill, Integer> req : targetRequirements.skills()) {
             if (req.b() == 0) continue;
             Set<IngredientInfo> ingOptions = validReqs.get(req.a());
@@ -155,6 +159,7 @@ public class Reverser {
             //System.out.println("recipe option is now " + recipeOptions.size() + " after " + req.a().getDisplayName());
         }
 
+        // add at least one of every stat
         for (StatPossibleValues id : targetPossibleValues) {
             Set<IngredientInfo> ingOptions = validStats.get(id.statType());
             if (id.baseValue() == 0) continue;
@@ -162,17 +167,16 @@ public class Reverser {
             //System.out.println("recipe option is now " + recipeOptions.size() + " after " + id.statType().getDisplayName());
         }
 
+        // fill every existing possible valid recipe with every combination of valid ings (outputs a couple thousand not many)
         fillWith(allValid);
-
-        //checkAll();
-
-        //System.out.println("recipe option is now " + recipeOptions.size() + " after check");
-
-        //recipe option is now 6246 after filling
-
         System.out.println("recipe option is now " + recipeOptions.size() + " after filling");
+
         Set<List<IngredientItemMaps>> allMetaCombinations = new HashSet<>();
         for (List<IngredientItemMaps> recipeOption : recipeOptions) {
+            //TODO this is where it blows up need to smart add meta ings ie:
+            // calculate if each slot need + or - effectivness to reach target
+            // then check empty slots and find meta ings that are usefull toward reaching target
+            // can check against the max dura from possible recipe data to see if dura is < target dura
             allMetaCombinations.addAll(findAllMetaCombinations(recipeOption, new ArrayList<>(validMetaIngs)));
             //if (recipeOption.size() == 6) System.out.println(recipeOption);
         }
@@ -180,7 +184,9 @@ public class Reverser {
         recipeOptions = allMetaCombinations;
         System.out.println("recipe option is now " + recipeOptions.size() + " after permuting with meta ings");
 
+        // set filters out recipes that are identical statwise but are a different order of ings
         Set<CraftingResult> possibleRecipes = new HashSet<>();
+
         int duplicateCounter = 0;
         Set<String> seen = new HashSet<>();
         for (List<IngredientItemMaps> ingsList : recipeOptions) {
@@ -193,22 +199,12 @@ public class Reverser {
             mutableRecipe.setIngredients(ingsList);
             mutableRecipe.updateMultipliers();
 
-
             CraftingResult result = mutableRecipe.craft();
+            if (result == null) continue;
             if (result.equalsIgnoreDurability(target, false)) {
-                for (IngredientInfo ing : mutableRecipe.getIngredients()) {
-                    //System.out.println(ing.name());
-                }
-                //System.out.println("\nadding " + result);
-                //System.out.println("hash " + result.hashCode());
                 possibleRecipes.add(result);
             }
 
-        }
-
-        for (CraftingResult result : possibleRecipes) {
-            //System.out.println(result.toString());
-            //System.out.println("\n");
         }
 
         System.out.println("found " + duplicateCounter + " duplicates");
@@ -216,11 +212,10 @@ public class Reverser {
 
         // add to know even if it fails so we dont continually retry on failures
         knownRecipes.put(hashable, possibleRecipes);
-        if (!possibleRecipes.isEmpty()) {
-            return possibleRecipes;
-        } else return Collections.emptySet();
+        return possibleRecipes;
     }
 
+    // mutates recipeOptions and guarantess ever recipe has atleast one of the specified req/id
     private void addNext(Set<IngredientInfo> ingOptions, Function<IngredientItemMaps, Boolean> checker) {
         if (recipeOptions.isEmpty()) {
             for (IngredientInfo ing : ingOptions) {
@@ -230,6 +225,8 @@ public class Reverser {
             Set<List<IngredientItemMaps>> toRemove = new HashSet<>();
             Set<List<IngredientItemMaps>> toAdd = new HashSet<>();
             for (List<IngredientItemMaps> currentRecipe : recipeOptions) {
+
+                // if recipe already contains do ntohing
                 boolean alreadyContains = false;
                 for (IngredientItemMaps existingIng : currentRecipe) {
                     if (checker.apply(existingIng)) {
@@ -237,6 +234,8 @@ public class Reverser {
                         break;
                     }
                 }
+
+                // if it does not contain remove it and add a new recipe for current+every ing that has that stat
                 if (!alreadyContains) {
                     toRemove.add(currentRecipe);
                     if (currentRecipe.size() < 6) {
@@ -253,6 +252,7 @@ public class Reverser {
         }
     }
 
+    // mutates recipe options
     private void fillWith(Set<IngredientInfo> ingOptions) {
         Queue<List<IngredientItemMaps>> queue = new ArrayDeque<>(recipeOptions);
         Set<List<IngredientItemMaps>> results = new HashSet<>();
@@ -261,24 +261,28 @@ public class Reverser {
         while (!queue.isEmpty()) {
             List<IngredientItemMaps> current = queue.poll();
 
+            // avoid duplicates
             String key = current.stream()
                     .map(ing -> ing == null ? "null" : ing.getIngredientInfo().name())
                     .sorted()
                     .collect(Collectors.joining(","));
             if (!seen.add(key)) continue;
 
+            // if its already full add it to results and go next (since we swap with recipeOptions at end not add too)
             if (current.size() == 6) {
                 if (!isIncorrect(current)) {
                     results.add(current);
                 }
                 continue;
-            } else if (current.size() > 6) {
+            } else if (current.size() > 6) { // why is this even here
                 System.err.println("5 + 1 = 7 ???");
                 return;
             }
 
+            // if its less than six then add it to results (everything in recipeOptions is valid we are filling)
             results.add(current);
 
+            // also add a new recipe for current + every ing to the queue (will be added to results when iterated over)
             for (IngredientInfo ing : ingOptions) {
                 ArrayList<IngredientItemMaps> extended = new ArrayList<>(current);
                 extended.add(new IngredientItemMaps(ing));
@@ -289,37 +293,16 @@ public class Reverser {
         recipeOptions = results;
     }
 
-
-    private void checkAll() {
-        //IngredientItemMaps bestDura = new IngredientItemMaps(CraftingUtils.getIng("Elephelk Trunk")); // TODO method
-
-        Set<List<IngredientItemMaps>> toRemove = new HashSet<>();
-        for (Triple<RecipeLoader.RecipeData, Integer, Integer> possibility : possibleMaterialData) {
-            mutableRecipe.setFromTriple(possibility);
-            for (List<IngredientItemMaps> currentRecipe : recipeOptions) {
-                List<IngredientItemMaps> copy = new ArrayList<>(currentRecipe);
-
-                mutableRecipe.setIngredients(copy);
-                CraftingResult craft = mutableRecipe.craft();
-
-                //GearRequirements requirements = craft.requirements();
-                RangedValue durability = craft.durability();
-                if (durability.high() < target.getDurability().max()) {
-                    toRemove.add(currentRecipe);
-                    continue;
-                }
-            }
-        }
-        recipeOptions.removeAll(toRemove);
-    }
-
     // does not imply the opposite
     private boolean isIncorrect(List<IngredientItemMaps> ingredients) {
+        if (ingredients.size() != 6) return false;
         Map<StatType, RangedValue> totalIds = new HashMap<>();
 
         for (IngredientItemMaps ing : ingredients) {
             // instantly return that it might be correct if it has ing effectiveness this is just a quick scan
             if (!ing.getIngredientInfo().positionModifiers().isEmpty()) return false;
+
+            // get every id and add it to running total
             for (Pair<StatType, RangedValue> id : ing.getIngredientInfo().variableStats()) {
                 RangedValue existing = totalIds.get(id.a());
                 if (existing == null) {
@@ -331,83 +314,12 @@ public class Reverser {
             }
         }
 
+        // check if target is within range
         for (StatPossibleValues targetId : target.getPossibleValues()) {
             RangedValue givenId = totalIds.get(targetId.statType());
             if (givenId == null) return true;
             if (!givenId.inRange(targetId.baseValue())) return true;
         }
-
-        return false;
-    }
-
-    // TODO flip for negative
-    private boolean shouldTrim(List<IngredientItemMaps> ingredients) {
-        // map stattype -> best ingredient for that stat (highest high value)
-        Map<StatType, Pair<IngredientItemMaps, Double>> bestIngForStat = new HashMap<>();
-
-        for (IngredientItemMaps ing : ingredients) {
-            if (ing == null) continue;
-
-            for (Pair<StatType, RangedValue> stat : ing.getIngredientInfo().variableStats()) {
-                StatType statType = stat.a();
-                double currentHigh = stat.b().high();
-
-                // Check if this ingredient is better for this stat
-                bestIngForStat.merge(
-                        statType,
-                        new Pair<>(ing, currentHigh),
-                        (existing, candidate) -> candidate.b() > existing.b() ? candidate : existing
-                );
-            }
-        }
-
-        // calculate multiplier for each stat based on its best ingredient
-        Map<StatType, Double> statMultipliers = new HashMap<>();
-        Map<IngredientItemMaps, List<StatType>> ingToStats = new HashMap<>();
-
-        for (StatPossibleValues targetId : target.getPossibleValues()) {
-            StatType statType = targetId.statType();
-            double targetValue = targetId.baseValue();
-
-            Pair<IngredientItemMaps, Double> bestPair = bestIngForStat.get(statType);
-            if (bestPair == null) return true;
-
-            IngredientItemMaps bestIng = bestPair.a();
-            double bestHigh = bestPair.b();
-
-            if (bestHigh <= 0) return true;
-
-            // multiplier needed for this stat
-            double multiplier = targetValue / bestHigh;
-            statMultipliers.put(statType, multiplier);
-
-            // track which stats each ingredient is best for
-            ingToStats.computeIfAbsent(bestIng, k -> new ArrayList<>()).add(statType);
-        }
-
-        // for each ingredient take the max multiplier of all stats its best for
-        for (Map.Entry<IngredientItemMaps, List<StatType>> entry : ingToStats.entrySet()) {
-            IngredientItemMaps ing = entry.getKey();
-            List<StatType> stats = entry.getValue();
-
-            OptionalDouble maxMultiplier = stats.stream()
-                    .mapToDouble(statMultipliers::get)
-                    .max();
-
-            double totalWeight = stats.stream()
-                    .mapToDouble(stat -> {
-                        // Normalize by how much this stat contributes vs others
-                        double statValue = ing.getIdentification(stat).high();
-                        double allValuesSum = stats.stream()
-                                .mapToDouble(s -> ing.getIdentification(s).high())
-                                .sum();
-                        return statValue / allValuesSum;
-                    })
-                    .sum();
-
-        }
-
-        //TODO empty slots and count of max for stats
 
         return false;
     }

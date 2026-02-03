@@ -252,14 +252,15 @@ public record CraftingResult(
         if (!Objects.equals(duration, that.duration)) return false;
         if (!Objects.equals(damage, that.damage)) return false;
 
-        // Compare requirements using custom matcher
-        if (!requirementsMatch(requirements, that.requirements, false)) return false;
-
         // Compare possibleValues, filtering out zero ranges
         Set<StatPossibleValues> filteredThis = filterZeroStats(possibleValues);
         Set<StatPossibleValues> filteredThat = filterZeroStats(that.possibleValues);
+        if (!filteredThis.equals(filteredThat)) return false;
 
-        return filteredThis.equals(filteredThat);
+        // Compare requirements using custom matcher
+        if (!requirementsMatch(requirements, that.requirements, false)) return false;
+
+        return true;
     }
 
     @Override
@@ -272,7 +273,11 @@ public record CraftingResult(
 
     public static boolean requirementsMatch(GearRequirements a, GearRequirements b, boolean debug) {
         //if (Math.abs(a.level() - b.level()) > 2) return false;
-        if (!Objects.equals(a.classType(), b.classType())) return false;
+
+        ClassType aClass = normalizeClassType(a.classType());
+        ClassType bClass = normalizeClassType(b.classType());
+        if (aClass != bClass) return false;
+
         Map<Skill, Integer> aSkills = filterNonZeroSkills(a.skills());
         Map<Skill, Integer> bSkills = filterNonZeroSkills(b.skills());
         boolean skillsMatch = aSkills.equals(bSkills);
@@ -282,6 +287,14 @@ public record CraftingResult(
             System.out.println("skillsMatch: " + skillsMatch);
         }
         return skillsMatch;
+    }
+
+    @SuppressWarnings({"OptionalUsedAsFieldOrParameterType", "OptionalAssignedToNull"})
+    private static ClassType normalizeClassType(Optional<ClassType> classTypeOpt) {
+        if (classTypeOpt == null || classTypeOpt.isEmpty()) {
+            return ClassType.NONE;
+        }
+        return classTypeOpt.get();
     }
 
     private static int requirementsHash(GearRequirements req) {

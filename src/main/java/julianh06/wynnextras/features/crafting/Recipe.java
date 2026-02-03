@@ -36,16 +36,38 @@ public class Recipe {
     private static final Double[] tierToMult = {0.0, 1.0, 1.25, 1.4};
 
     public static class Materials {
-        int mat1Tier;
-        int mat1Count;
-        int mat2Tier;
-        int mat2Count;
+        private int mat1Tier;
+        private int mat1Count;
+        private int mat2Tier;
+        private int mat2Count;
+
+        public void setMat1Tier(int mat1Tier) {
+            this.mat1Tier = mat1Tier;
+        }
+
+        public void setMat2Tier(int mat2Tier) {
+            this.mat2Tier = mat2Tier;
+        }
+
+        public Materials(Materials materials) {
+            this.mat1Tier = materials.mat1Tier;
+            this.mat1Count = materials.mat1Count;
+            this.mat2Tier = materials.mat2Tier;
+            this.mat2Count = materials.mat2Count;
+        }
 
         public Materials(int mat1Tier, int mat1Count, int mat2Tier, int mat2Count) {
             this.mat1Tier = mat1Tier;
             this.mat1Count = mat1Count;
             this.mat2Tier = mat2Tier;
             this.mat2Count = mat2Count;
+        }
+
+        public Materials(List<RecipeLoader.RecipeData.Material> list) {
+            this.mat1Tier = 1;
+            this.mat1Count = list.getFirst().getAmount();
+            this.mat2Tier = 1;
+            this.mat2Count = list.getLast().getAmount();
         }
 
         public double getMultiplier() {
@@ -114,19 +136,21 @@ public class Recipe {
     }
 
     public void setLevel(Vector2i level) {
-        this.level = level;
-        RecipeLoader.RecipeData ranges = RecipeLoader.getRecipe(type, level);
-        if (ranges == null) {
-            System.err.println("cannot set recipe to lvl " + this.level + " no constant found");
+        RecipeLoader.RecipeData data = RecipeLoader.getRecipe(type, level);
+        if (data == null) {
+            System.err.println("cannot set recipe to lvl " + this.level + " no data found");
             return;
         }
-        this.dura = ranges.durability();
-        this.healthOrDmg = ranges.healthOrDamage();
+        setConstants(data);
     }
 
     public void setConstants(RecipeLoader.RecipeData data) {
         this.level = data.lvl();
-        this.dura = data.durability();
+        if (type.isConsumable()) {
+            this.dura = data.duration();
+        } else this.dura = data.durability();
+        this.healthOrDmg = data.healthOrDamage();
+        this.materials = new Materials(data.materials());
         this.healthOrDmg = data.healthOrDamage();
     }
 
@@ -146,6 +170,10 @@ public class Recipe {
         }
 
         this.ingredients = result;
+    }
+
+    public Materials getMaterials() {
+        return materials;
     }
 
     public IngredientInfo[] getIngredients() {
@@ -272,9 +300,7 @@ public class Recipe {
 
             int levelReq = ing.level();
             if (levelReq > getLevel().y) {
-                System.out.println("cannot use ingredient " + ing.name() + " for lvl range "
-                        + getLevel().x + "-" + getLevel().y
-                        + " requires lvl " + levelReq);
+                //System.out.println("cannot use ingredient " + ing.name() + " for lvl range " + getLevel().x + "-" + getLevel().y + " requires lvl " + levelReq);
                 return false;
             }
         }
