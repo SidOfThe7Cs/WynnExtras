@@ -4,14 +4,13 @@ import com.wynntils.core.components.Models;
 import com.wynntils.models.character.CharacterModel;
 import com.wynntils.models.worlds.event.WorldStateEvent;
 import com.wynntils.utils.mc.McUtils;
-import julianh06.wynnextras.features.inventory.BankOverlay;
-import julianh06.wynnextras.features.inventory.BankOverlayType;
 import julianh06.wynnextras.features.inventory.data.CharacterBankData;
 import julianh06.wynnextras.utils.WynncraftApiHandler;
 import julianh06.wynnextras.features.profileviewer.data.CharacterData;
 import julianh06.wynnextras.utils.TickScheduler;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -36,32 +35,19 @@ public class CharacterModelMixin {
     )
     private void onWorldStateChanged(WorldStateEvent e, CallbackInfo ci) {
         String id = this.id;
-
-        if (id == null || id.isEmpty() || id.equals("-")) {
-            return;
-        }
-
-        BankOverlay.Pages = null;
-        BankOverlay.currentData = null;
-        BankOverlay.activeInvSlots.clear();
-        BankOverlay.annotationCache.clear();
-        BankOverlay.expectedOverlayType = BankOverlayType.NONE;
-
-        BankOverlay.currentCharacterID = id;
-        CharacterBankData.INSTANCE.load();
+        int combatLevel = this.level;
+        if (id == null || id.isEmpty() || id.equals("-")) return;
 
         // Delay to allow Wynntils to finish populating character data
         final String characterId = id;
-        TickScheduler.runAfterTicks(40, () -> {
-            updateCharacterInfo(characterId);
-        });
+        TickScheduler.runAfterTicks(40, () -> updateCharacterInfo(characterId, combatLevel));
     }
 
-    private void updateCharacterInfo(String characterId) {
+    @Unique
+    private void updateCharacterInfo(String characterId, int combatLevel) {
         try {
             // First try Wynntils local data
             String actualName = Models.Character.getActualName();
-            int combatLevel = this.level;
 
             System.out.println("[WynnExtras] Wynntils data - Name: " + actualName + ", Level: " + combatLevel);
 
@@ -83,6 +69,7 @@ public class CharacterModelMixin {
         }
     }
 
+    @Unique
     private void fetchCharacterFromApi(String characterId) {
         if (McUtils.player() == null) return;
 

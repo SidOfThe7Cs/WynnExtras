@@ -266,6 +266,7 @@ public class WynnExtras implements ClientModInitializer {
 
 	@SubscribeEvent
 	public void onClientTick(TickEvent event) {
+		CharacterIdChangeEvent.onClientTick();
 		WynnExtrasConfig config = WynnExtrasConfig.INSTANCE;
 		if(config.differentGUIScale) {
 			if (MinecraftClient.getInstance().currentScreen == null) {

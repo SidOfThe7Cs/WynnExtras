@@ -11,10 +11,7 @@ import com.wynntils.models.containers.containers.personal.MiscBucketContainer;
 import com.wynntils.utils.mc.McUtils;
 import julianh06.wynnextras.core.WynnExtras;
 import julianh06.wynnextras.annotations.WEModule;
-import julianh06.wynnextras.event.CharInputEvent;
-import julianh06.wynnextras.event.KeyInputEvent;
-import julianh06.wynnextras.event.TickEvent;
-import julianh06.wynnextras.event.WorldChangeEvent;
+import julianh06.wynnextras.event.*;
 import julianh06.wynnextras.features.bankoverlay.BankOverlay2;
 import julianh06.wynnextras.features.inventory.data.*;
 import julianh06.wynnextras.utils.overlays.EasyTextInput;
@@ -200,15 +197,21 @@ public class BankOverlay {
     }
 
     @SubscribeEvent
-    public void onWorldChange(WorldChangeEvent event) {
-        currentOverlayType = BankOverlayType.NONE;
-        expectedOverlayType = BankOverlayType.NONE;
-        currentData = null;
-        Pages = null;
-        activeInv = -1;
-        activeInvSlots.clear();
-        annotationCache.clear();
-        heldItem = Items.AIR.getDefaultStack();
-        registeredScroll = false;
+    public void onCharIdChange(CharacterIdChangeEvent event) {
+        if (event.newId == null || event.newId.isEmpty() || event.newId.equals("-")) {
+            currentOverlayType = BankOverlayType.NONE;
+            expectedOverlayType = BankOverlayType.NONE;
+            currentData = null;
+            Pages = null;
+            activeInv = -1;
+            activeInvSlots.clear();
+            annotationCache.clear();
+            heldItem = Items.AIR.getDefaultStack();
+            registeredScroll = false;
+            return;
+        }
+
+        currentCharacterID = event.newId;
+        CharacterBankData.INSTANCE.load();
     }
 }
