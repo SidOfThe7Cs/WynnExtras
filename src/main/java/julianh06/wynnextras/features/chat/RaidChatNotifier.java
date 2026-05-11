@@ -9,12 +9,15 @@ import com.wynntils.utils.mc.McUtils;
 import com.wynntils.core.components.Models;
 import com.wynntils.utils.type.Time;
 import com.wynntils.core.text.StyledText;
+import julianh06.wynnextras.annotations.WEModule;
 import julianh06.wynnextras.core.WynnExtras;
+import julianh06.wynnextras.event.ChatEvent;
 import julianh06.wynnextras.mixin.RaidKindAccessor;
 import julianh06.wynnextras.utils.ChatUtils;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.Text;
+import net.neoforged.bus.api.SubscribeEvent;
 import julianh06.wynnextras.config.WynnExtrasConfig;
 
 import java.io.IOException;
@@ -29,9 +32,10 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+@WEModule
 public class RaidChatNotifier {
-    public static RaidChatNotifier INSTANCE = new RaidChatNotifier();
-    public Map<String, Long> raidPBs = new HashMap<>();
+    private static RaidChatNotifier INSTANCE = new RaidChatNotifier();
+    private Map<String, Long> raidPBs = new HashMap<>();
 
     public static long disableChiropUntil = 0;
 
@@ -127,6 +131,11 @@ public class RaidChatNotifier {
                     "§bRight key collected §c",
                     "hubertRightKey"
             ),
+            new SingleOccurrenceDetector(
+                    "Key! [2/2]",
+                    "§bBoth keys collected §c",
+                    "hubertBothKeys"
+            ),
 
             new MultiOccurrenceDetector(
                     "A new platform has appeared on the Lower Area!",
@@ -200,7 +209,7 @@ public class RaidChatNotifier {
             )
     );
 
-    private static void savePB(String key, long time) {
+    static void savePB(String key, long time) {
         Long old = INSTANCE.raidPBs.get(key);
 
         if (old == null || time < old) {
@@ -209,12 +218,31 @@ public class RaidChatNotifier {
         }
     }
 
-    private static Long getPB(String key) {
+    static Long getPB(String key) {
         return INSTANCE.raidPBs.get(key);
     }
 
+    // Registered automatically as a WEModule — receives ChatEvent so PB tracking works
+    // even if Wynntils's MessageFilterFeature (which our mixin taps into) is disabled.
+    @SubscribeEvent
+    public void onChatDirect(ChatEvent event) {
+        if (!WynnExtrasConfig.INSTANCE.toggleRaidTimestamps) return;
+        String raw = event.message.getString();
+        if (raw == null || raw.isEmpty()) return;
+        handleMessage(raw);
+    }
+
+    // Dedup so the mixin path and direct ChatEvent path don't double-process the same message.
+    private static String lastHandledMsg = null;
+    private static long lastHandledMs = 0;
+
     public static void handleMessage(String rawMsg) {
         if (!WynnExtrasConfig.INSTANCE.toggleRaidTimestamps) return;
+        if (rawMsg == null) return;
+        long now = System.currentTimeMillis();
+        if (rawMsg.equals(lastHandledMsg) && now - lastHandledMs < 200) return;
+        lastHandledMsg = rawMsg;
+        lastHandledMs = now;
 
         long currentTime = (Models.Raid.getCurrentRaid() != null && Models.Raid.getCurrentRaid().getCurrentRoom() != null)
                 ? Models.Raid.getCurrentRaid().getCurrentRoom().getRoomTotalTime()
@@ -238,8 +266,6 @@ public class RaidChatNotifier {
                         );
                     }
                 });
-
-                return;
             }
         }
     }
@@ -253,7 +279,7 @@ public class RaidChatNotifier {
         return formatTime(Models.Raid.getCurrentRaid().getCurrentRoom().getRoomTotalTime());
     }
 
-    private static String formatTime(long millis) {
+    public static String formatTime(long millis) {
         long minutes = (millis / 1000) / 60;
         long seconds = (millis / 1000) % 60;
         long ms = millis % 1000;
@@ -309,7 +335,9 @@ public class RaidChatNotifier {
             Pattern.compile("A player must stand on the platform", Pattern.CASE_INSENSITIVE),
             Pattern.compile("A miniboss has spawned! It has sped", Pattern.CASE_INSENSITIVE),
             Pattern.compile("The golem has been defeated, and", Pattern.CASE_INSENSITIVE),
-            Pattern.compile("has picked up the Wings!", Pattern.CASE_INSENSITIVE)
+            Pattern.compile("has picked up the Wings!", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("Collected the Left Key!", Pattern.CASE_INSENSITIVE),
+            Pattern.compile("Collected the Right Key!", Pattern.CASE_INSENSITIVE)
     );
 
 
@@ -613,6 +641,43 @@ public class RaidChatNotifier {
 
 
 
+    /** Like SingleOccurrenceDetector but only fires once per raid — subsequent matches in the
+     *  same raid are silently ignored. Resets on raid start via {@link #resetCounters()}. */
+    private static class FirstPerRaidDetector implements RaidMessageDetector {
+        private final Pattern pattern;
+        private final String formattedMessage;
+        private final String pbKey;
+        private boolean fired = false;
+
+        public FirstPerRaidDetector(String regex, String formattedMessage, String pbKey) {
+            this.pattern = Pattern.compile(Pattern.quote(regex), Pattern.CASE_INSENSITIVE);
+            this.formattedMessage = formattedMessage;
+            this.pbKey = pbKey;
+        }
+
+        public void resetForNewRaid() { fired = false; }
+
+        @Override public boolean matches(String msg) { return !fired && pattern.matcher(msg).find(); }
+        @Override public String extractProgress(String msg) { return null; }
+
+        @Override
+        public String getFormattedMessage(String progress, String timestamp) {
+            fired = true;
+            String message = formattedMessage + timestamp;
+            if (Models.Raid.getCurrentRaid() != null && Models.Raid.getCurrentRaid().getCurrentRoom() != null) {
+                long currentTime = Models.Raid.getCurrentRaid().getCurrentRoom().getRoomTotalTime();
+                Long pb = getPB(pbKey);
+                if (pb == null || currentTime < pb) {
+                    savePB(pbKey, currentTime);
+                    message += (pb == null ? " §e[First PB]" : " §e[New PB! Old: " + formatTime(pb) + "]");
+                } else {
+                    message += " §7[PB: " + formatTime(pb) + "]";
+                }
+            }
+            return message;
+        }
+    }
+
     private static class MultiOccurrenceDetector implements RaidMessageDetector {
         private final Pattern pattern;
         private final String baseMessage;
@@ -696,7 +761,11 @@ public class RaidChatNotifier {
             else if (detector instanceof WatchPhaseDetector w) {
                 w.resetForNewRaid();
             }
+            else if (detector instanceof FirstPerRaidDetector f) {
+                f.resetForNewRaid();
+            }
         }
+        julianh06.wynnextras.features.chat.ChainsAttachedTracker.resetForNewRaid();
     }
 
     public static void onRoomCompleted(RaidInfo raidInfo) {
@@ -724,7 +793,7 @@ public class RaidChatNotifier {
         String roomName = room.getRoomName();
         long time = room.getRoomTotalTime();
 
-        String pbKey = raidInfo.getRaidKind().getAbbreviation() + "_" + roomName.replaceAll("\\s", "");
+        String pbKey = stableRaidKey(raidInfo.getRaidKind()) + "_" + roomName.replaceAll("\\s", "");
 
         Long pb = getPB(pbKey);
 
@@ -752,9 +821,9 @@ public class RaidChatNotifier {
             String timestamp
     ) {
         String bossName = room.getRoomName();
-        String raidAbbr = raidInfo.getRaidKind().getAbbreviation();
+        String raidKey = stableRaidKey(raidInfo.getRaidKind());
 
-        String pbKey = "boss_" + raidAbbr + "_" + index;
+        String pbKey = "boss_" + raidKey + "_" + index;
         Long pb = getPB(pbKey);
 
         String msg = "§a§l" + bossName + " §r§bdefeated after §c" + timestamp;
@@ -796,32 +865,96 @@ public class RaidChatNotifier {
                 gson.toJson(INSTANCE, writer);
             }
         } catch (IOException e) {
-            System.err.println("[WynnExtras] Couldn't write PB data:");
+            WynnExtras.LOGGER.error("[WynnExtras] Couldn't write PB data:");
             e.printStackTrace();
         }
     }
 
-    public void load() {
+    public static void load() {
         Path path = FabricLoader.getInstance().getConfigDir().resolve("wynnextras/raidPBs.json");
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
         try {
             Files.createDirectories(path.getParent());
         } catch (IOException e) {
-            System.err.println("[WynnExtras] Couldn't create config directory:");
+            WynnExtras.LOGGER.error("[WynnExtras] Couldn't create config directory:");
             e.printStackTrace();
         }
 
         if (Files.exists(path)) {
             try (Reader reader = Files.newBufferedReader(path)) {
-                RaidChatNotifier loaded = gson.fromJson(reader, this.getClass());
+                RaidChatNotifier loaded = gson.fromJson(reader, RaidChatNotifier.class);
                 if (loaded != null) {
                     INSTANCE = loaded;
                 }
             } catch (IOException e) {
-                System.err.println("[WynnExtras] Couldn't read PB data:");
+                WynnExtras.LOGGER.error("[WynnExtras] Couldn't read PB data:");
                 e.printStackTrace();
             }
         }
+
+        if (INSTANCE.migratePBKeys()) INSTANCE.save();
+    }
+
+    /**
+     * Stable PB-key prefix that survives Wynntils renaming the public abbreviation
+     * (e.g. TWP -> WTP between 4.1.8 and 4.1.9). Derived from the RaidKind's class
+     * simple name with the "Raid" suffix stripped.
+     */
+    static String stableRaidKey(RaidKind kind) {
+        if (kind == null) return "?";
+        String simple = kind.getClass().getSimpleName();
+        if (simple.endsWith("Raid")) simple = simple.substring(0, simple.length() - 4);
+        return simple;
+    }
+
+    // Old abbreviation -> stable class-derived key. Both TWP and WTP folded into
+    // TheWartornPalace so old PBs survive the Wynntils 4.1.8 -> 4.1.9 rename.
+    private static final Map<String, String> RAID_KEY_ALIASES = Map.of(
+            "TWP", "TheWartornPalace",
+            "WTP", "TheWartornPalace",
+            "NOG", "NestOfTheGrootslangs",
+            "NOL", "OrphionsNexusOfLight",
+            "TCC", "TheCanyonColossus",
+            "TNA", "TheNamelessAnomaly"
+    );
+
+    /**
+     * Rewrites legacy PB keys ({@code <ABBR>_Room} / {@code boss_<ABBR>_idx}) to use the
+     * stable raid key. When the new key already holds a PB, the better (lower) time wins
+     * so users never lose a PB to a rename. Returns true if any entry was changed.
+     */
+    boolean migratePBKeys() {
+        if (raidPBs == null || raidPBs.isEmpty()) return false;
+        Map<String, Long> migrated = new HashMap<>();
+        boolean changed = false;
+        for (Map.Entry<String, Long> e : raidPBs.entrySet()) {
+            String key = e.getKey();
+            Long val = e.getValue();
+            String rewritten = rewriteLegacyKey(key);
+            if (!rewritten.equals(key)) changed = true;
+            migrated.merge(rewritten, val, Math::min);
+        }
+        if (changed) raidPBs = migrated;
+        return changed;
+    }
+
+    private static String rewriteLegacyKey(String key) {
+        if (key.startsWith("boss_")) {
+            int second = key.indexOf('_', 5);
+            if (second > 5) {
+                String abbr = key.substring(5, second);
+                String stable = RAID_KEY_ALIASES.get(abbr);
+                if (stable != null) return "boss_" + stable + key.substring(second);
+            }
+            return key;
+        }
+        int sep = key.indexOf('_');
+        if (sep > 0) {
+            String abbr = key.substring(0, sep);
+            String stable = RAID_KEY_ALIASES.get(abbr);
+            if (stable != null) return stable + key.substring(sep);
+        }
+        return key;
     }
 }

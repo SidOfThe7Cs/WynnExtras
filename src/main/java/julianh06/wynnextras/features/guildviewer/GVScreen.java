@@ -1,5 +1,6 @@
 package julianh06.wynnextras.features.guildviewer;
 
+import julianh06.wynnextras.core.WynnExtras;
 import com.wynntils.utils.colors.CustomColor;
 import com.wynntils.utils.mc.McUtils;
 import com.wynntils.utils.render.RenderUtils;
@@ -52,6 +53,9 @@ import java.util.*;
 import static julianh06.wynnextras.utils.UI.UIUtils.*;
 
 public class GVScreen extends WEScreen {
+    @Override protected double getTargetScaleFactor() { return 2.0; }
+    @Override protected int getMinLogicalWidth()  { return 1900; }
+    @Override protected int getMinLogicalHeight() { return 870; }
     static Identifier onlineCircleTextureDark = Identifier.of("wynnextras", "textures/gui/profileviewer/onlinecircle_dark.png");
     static Identifier onlineCircleTexture = Identifier.of("wynnextras", "textures/gui/profileviewer/onlinecircle.png");
 
@@ -126,15 +130,22 @@ public class GVScreen extends WEScreen {
     //im drawing the tab stuff in updateValues so the background has to be rendered first that's why this override exists
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         mouseInMenu = false;
-        PVScreen.mouseX = mouseX;
-        PVScreen.mouseY = mouseY;
 
         this.drawContext = context;
         computeScaleAndOffsets();
         if (ui == null) ui = new UIUtils(context, scaleFactor, xStart, yStart);
         else ui.updateContext(context, scaleFactor, xStart, yStart);
 
+        mouseX = (int)(mouseX / matrixScale);
+        mouseY = (int)(mouseY / matrixScale);
+        PVScreen.mouseX = mouseX;
+        PVScreen.mouseY = mouseY;
+
         ui.drawBackground();
+
+        context.getMatrices().pushMatrix();
+        context.getMatrices().scale((float) matrixScale, (float) matrixScale);
+
         backgroundImageWidget.draw(context, mouseX, mouseY, delta, ui);
         updateValues();
         updateVisibleListRange();
@@ -184,7 +195,7 @@ public class GVScreen extends WEScreen {
         if (searchBar != null) {
             searchBar.setX((int) ((xStart + 89 * 3) / ui.getScaleFactor()));
             searchBar.setY((int) ((yStart + backgroundImageWidget.getHeight() + 20) / scaleFactor) + 1);
-            searchBar.drawWithoutBackground(context, CustomColor.fromHexString("FFFFFF"));
+            searchBar.drawWithoutBackground(context, CustomColor.fromHexString("FFFFFF"), (float) ui.getScaleFactor());
         }
 
         if (GV.currentGuildData == null) return;
@@ -208,8 +219,7 @@ public class GVScreen extends WEScreen {
         ui.drawCenteredText("Level " + GV.currentGuildData.level, xStart + 285, yStart + 590);
         PVScreen.DarkModeToggleWidget.drawImageWithFade(xpbarbackground_dark, xpbarbackground, xStart + 66, yStart + 540, 435, 30, ui);
 
-        context.enableScissor((int) ui.sx(xStart + 66), (int) ui.sy(yStart + 540), (int) ui.sx(xStart + 66 + 435 * (GV.currentGuildData.xpPercent / 100f)), (int) ui.sy(yStart + 540 + 35));
-        ui.drawImage(xpbarprogress, xStart + 66, yStart + 540, 435, 30);
+        context.enableScissor((int) ui.sx(xStart + 66), (int) ui.sy(yStart + 540), (int) ui.sx(xStart + 66 + 435 * (GV.currentGuildData.xpPercent / 100f)), (int) ui.sy(yStart + 540 + 35));ui.drawImage(xpbarprogress, xStart + 66, yStart + 540, 435, 30);
         context.disableScissor();
 
         PVScreen.DarkModeToggleWidget.drawImageWithFade(xpbarborder_dark, xpbarborder, xStart + 66, yStart + 540, 435, 30, ui);
@@ -241,10 +251,10 @@ public class GVScreen extends WEScreen {
         if (bannerBlockEntity != null) {
             bannerGuiState = new BannerGuiElementState(
                     new BannerFlagBlockModel(MinecraftClient.getInstance().getLoadedEntityModels().getModelPart(EntityModelLayers.STANDING_BANNER_FLAG)), bannerBlockEntity.getColorForState(), bannerBlockEntity.getPatterns(),
-                    (int) (x1 / scaleFactor), (int) (y1 / scaleFactor),
-                    (int) (x2 / scaleFactor), (int) (y2 / scaleFactor),
+                    (int) (x1 * matrixScale / scaleFactor), (int) (y1 * matrixScale / scaleFactor),
+                    (int) (x2 * matrixScale / scaleFactor), (int) (y2 * matrixScale / scaleFactor),
                     context.scissorStack.peekLast(),
-                    48 * 3 / ui.getScaleFactorF()
+                    (float)(48 * 3 * matrixScale / scaleFactor)
             );
 
             ui.drawImage(
@@ -429,6 +439,8 @@ public class GVScreen extends WEScreen {
 
         scrollBarWidget.setBounds(xStart + 1820, yStart, 30, 750);
         scrollBarWidget.draw(context, mouseX, mouseY, delta, ui);
+
+        context.getMatrices().popMatrix();
     }
 
     @Override
@@ -443,8 +455,8 @@ public class GVScreen extends WEScreen {
 
     @Override
     public boolean mouseClicked(Click click, boolean doubleClick) {
-        double mouseX = click.x();
-        double mouseY = click.y();
+        double mouseX = click.x() / matrixScale;
+        double mouseY = click.y() / matrixScale;
         int button = click.button();
 
         if(scrollBarWidget != null) scrollBarWidget.mouseClicked(mouseX, mouseY, button);
@@ -478,8 +490,8 @@ public class GVScreen extends WEScreen {
 
     @Override
     public boolean mouseReleased(Click click) {
-        double mouseX = click.x();
-        double mouseY = click.y();
+        double mouseX = click.x() / matrixScale;
+        double mouseY = click.y() / matrixScale;
         int button = click.button();
 
         if(scrollBarWidget != null) scrollBarWidget.mouseReleased(mouseX, mouseY, button);
@@ -571,7 +583,7 @@ public class GVScreen extends WEScreen {
             case "TRIANGLES_BOTTOM" -> lookup.getOrThrow(BannerPatterns.TRIANGLES_BOTTOM);
             case "TRIANGLES_TOP" -> lookup.getOrThrow(BannerPatterns.TRIANGLES_TOP);
             default -> {
-                System.err.println("[WynnExtras] Unknown banner pattern: " + patternName);
+                WynnExtras.LOGGER.error("[WynnExtras] Unknown banner pattern: " + patternName);
                 yield null;
             }
         };
@@ -745,31 +757,7 @@ public class GVScreen extends WEScreen {
         @Override
         protected void drawContent(DrawContext ctx, int mouseX, int mouseY, float tickDelta) {
             currentMouseY = mouseY;
-
-            int scale = 5;
-
-            ui.drawSliderBackground(x, y, width, height, scale, false);
-
-            if (PVScreen.DarkModeToggleWidget.fade > 0.001f) {
-                RenderUtils.drawRect(
-                        ctx,
-                        CustomColor.fromHexString("1b1b1c").withAlpha(PVScreen.DarkModeToggleWidget.fade),
-                        ui.sx(x + scale) - 1,
-                        ui.sy(y + scale) - 1,
-                        ui.sw(width - scale * 2) + 2,
-                        ui.sh(height - scale * 2) + 2
-                );
-            }
-
-            ui.drawButtonTextures(
-                    x, y, width, height, scale,
-                    WynnExtrasConfig.INSTANCE.pvDarkmodeToggle,
-                    sliderButtontlDark, sliderButtontrDark, sliderButtonblDark, sliderButtonbrDark,
-                    sliderButtontopDark, sliderButtonbotDark, sliderButtonleftDark, sliderButtonrightDark,
-                    sliderButtontl, sliderButtontr, sliderButtonbl, sliderButtonbr,
-                    sliderButtontop, sliderButtonbot, sliderButtonleft, sliderButtonright, 1
-            );
-
+            ui.drawSliderFade(x, y, width, height, 5);
             updateScrollButton(mouseY);
         }
 

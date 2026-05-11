@@ -1,5 +1,6 @@
 package julianh06.wynnextras.features.profileviewer;
 
+import julianh06.wynnextras.core.WynnExtras;
 import com.wynntils.core.text.StyledText;
 import com.wynntils.utils.colors.CustomColor;
 import com.wynntils.utils.render.FontRenderer;
@@ -32,7 +33,7 @@ public class OpenInBrowserButton extends EasyButton {
             if (Desktop.isDesktopSupported()) {
                 LinkUtils.openLink(url);
             } else {
-                System.err.println("Error while opening the link");
+                WynnExtras.LOGGER.error("Error while opening the link");
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -46,6 +47,6 @@ public class OpenInBrowserButton extends EasyButton {
             return;
         }
         scaleFactor = (int) MinecraftClient.getInstance().getWindow().getScaleFactor();
-        FontRenderer.getInstance().renderText(context, StyledText.fromComponent(Text.of(buttonText)), (float) (x + 87.5f * 3 / scaleFactor / 2), y + (float) (8 * 3) / scaleFactor, CustomColor.fromHexString("FFFFFF"), HorizontalAlignment.CENTER, VerticalAlignment.TOP, TextShadow.NORMAL, 1f * 3 / scaleFactor);
+        FontRenderer.getInstance().renderText(context, StyledText.fromComponent(Text.of(buttonText)), (float) (x + 65), y + (float) 12, CustomColor.fromHexString("FFFFFF"), HorizontalAlignment.CENTER, VerticalAlignment.TOP, TextShadow.NORMAL, 1.4f);
     }
 }
