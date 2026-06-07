@@ -1,7 +1,7 @@
 package julianh06.wynnextras.features.misc;
 
 import julianh06.wynnextras.config.WynnExtrasConfig;
-import julianh06.wynnextras.features.qol.AttackTimer;
+import julianh06.wynnextras.features.war.AttackTimer;
 import julianh06.wynnextras.features.raid.RaidSessionTracker;
 import julianh06.wynnextras.features.raid.TreeRoomMinimap;
 import net.minecraft.client.MinecraftClient;

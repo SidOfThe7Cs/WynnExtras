@@ -1,4 +1,4 @@
-package julianh06.wynnextras.features.qol;
+package julianh06.wynnextras.features.war;
 
 import com.wynntils.core.components.Models;
 import julianh06.wynnextras.config.WynnExtrasConfig;

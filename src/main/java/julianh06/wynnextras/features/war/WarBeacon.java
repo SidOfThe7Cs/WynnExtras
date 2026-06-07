@@ -1,4 +1,4 @@
-package julianh06.wynnextras.features.qol;
+package julianh06.wynnextras.features.war;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;

@@ -1,4 +1,4 @@
-package julianh06.wynnextras.features.qol;
+package julianh06.wynnextras.features.war;
 
 import julianh06.wynnextras.config.WynnExtrasConfig;
 import julianh06.wynnextras.utils.BossBarUtils;
@@ -26,6 +26,7 @@ public class WarDPS {
     private static double dpsSinceStart = 0;
     private static double timeRemaining = 0;
     private static final List<Double> previousFiveEhp = new ArrayList<>();
+    private static boolean inWar = false;
 
     private static double ehpDisplay = 0;
     private static double lowerDpsDisplay = 0;
@@ -33,13 +34,23 @@ public class WarDPS {
     private static long timeDisplay = 0;
     private static String previousTerritoryName = "";
 
+    public static long getTimeSinceWarStart() {
+        if (!isInWar() || warStartTime == -1) return -1;
+        return System.currentTimeMillis() - warStartTime;
+    }
+
+    public static boolean isInWar() {
+        return inWar;
+    }
+
     public static void register() {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if (!WynnExtrasConfig.INSTANCE.warDpsEnabled) return;
+            inWar = false;
             if (client.player == null) return;
             for (ClientBossBar bar : BossBarUtils.getBossBars(client.inGameHud.getBossBarHud())) {
                 String text = bar.getName().getString();
                 if (text != null && text.contains("Tower")) {
+                    inWar = true;
                     processBossBar(text);
                     break;
                 }

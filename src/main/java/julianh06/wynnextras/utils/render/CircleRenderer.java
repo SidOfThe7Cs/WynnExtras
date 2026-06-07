@@ -9,6 +9,7 @@ import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import julianh06.wynnextras.core.WynnExtras;
+import julianh06.wynnextras.event.RenderWorldEvent;
 import julianh06.wynnextras.utils.WEVec;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.MappableRingBuffer;
@@ -25,8 +26,6 @@ import org.joml.Matrix4fc;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 import org.lwjgl.system.MemoryUtil;
-
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 
 import java.awt.*;
 import java.util.ArrayList;
@@ -62,36 +61,31 @@ public class CircleRenderer {
     // Queue of circles to render
     private final List<CircleData> circleQueue = new ArrayList<>();
 
-    public static class CircleData {
-        public final WEVec location;
-        public final double radius;
-        public final Color color;
-
-        public CircleData(WEVec location, double radius, Color color) {
-            this.location = location;
-            this.radius = radius;
-            this.color = color;
-        }
+    public record CircleData(WEVec location, double radius, double width, Color color) {
     }
 
     /**
      * Queue a circle to be rendered this frame.
      */
-    public void queueCircle(WEVec location, double radius, Color color) {
-        circleQueue.add(new CircleData(location, radius, color));
+    public void queueCircle(WEVec location, double radius, double width, Color color) {
+        circleQueue.add(new CircleData(location, radius, width, color));
+    }
+
+    public void queueCircle(Vec3d location, double radius, double width, Color color) {
+        circleQueue.add(new CircleData(new WEVec(location), radius, width, color));
     }
 
     /**
      * Render all queued circles and clear the queue.
      * This should be called from RenderEvents after the WEEvent is posted.
      */
-    public void renderQueuedCircles(WorldRenderContext context) {
+    public void renderQueuedCircles(RenderWorldEvent event) {
         if (circleQueue.isEmpty()) {
             return;
         }
 
-        MatrixStack matrices = context.matrices();
-        Vec3d camera = context.worldState().cameraRenderState.pos;
+        MatrixStack matrices = event.matrices;
+        Vec3d camera = event.camera.getCameraPos();
 
         matrices.push();
         matrices.translate(-camera.x, -camera.y, -camera.z);
@@ -104,7 +98,7 @@ public class CircleRenderer {
 
         // Add vertices for all queued circles
         for (CircleData circle : circleQueue) {
-            renderCircle(posMatrix, circle.location, circle.radius, circle.color);
+            renderCircle(posMatrix, circle.location, circle.radius, circle.width, circle.color);
         }
 
         matrices.pop();
@@ -116,7 +110,7 @@ public class CircleRenderer {
         circleQueue.clear();
     }
 
-    private void renderCircle(Matrix4fc posMatrix, WEVec location, double radius, Color color) {
+    private void renderCircle(Matrix4fc posMatrix, WEVec location, double radius, double width, Color color) {
         float r = color.getRed() / 255f;
         float g = color.getGreen() / 255f;
         float b = color.getBlue() / 255f;
@@ -128,26 +122,56 @@ public class CircleRenderer {
 
         double angleStep = 2 * Math.PI / SEGMENTS;
 
+        float outerRadius = (float) (radius + (width / 32f));
+        float innerRadius = (float) (radius - (width / 32f));
+
         for (int i = 0; i < SEGMENTS; i++) {
             double angle1 = i * angleStep;
             double angle2 = (i + 1) * angleStep;
 
-            float x1 = cx + (float) (Math.cos(angle1) * radius);
-            float z1 = cz + (float) (Math.sin(angle1) * radius);
-            float x2 = cx + (float) (Math.cos(angle2) * radius);
-            float z2 = cz + (float) (Math.sin(angle2) * radius);
+            float cos1 = (float) Math.cos(angle1);
+            float sin1 = (float) Math.sin(angle1);
+            float cos2 = (float) Math.cos(angle2);
+            float sin2 = (float) Math.sin(angle2);
 
-            // Draw outer face (visible from outside)
-            buffer.vertex(posMatrix, x1, cy, z1).color(r, g, b, a);
-            buffer.vertex(posMatrix, x1, cy + HEIGHT, z1).color(r, g, b, a);
-            buffer.vertex(posMatrix, x2, cy + HEIGHT, z2).color(r, g, b, a);
-            buffer.vertex(posMatrix, x2, cy, z2).color(r, g, b, a);
+            // Outer wall vertices
+            float x1_outer = cx + cos1 * outerRadius;
+            float z1_outer = cz + sin1 * outerRadius;
+            float x2_outer = cx + cos2 * outerRadius;
+            float z2_outer = cz + sin2 * outerRadius;
 
-            // Draw inner face (visible from inside) - reverse winding order
-            buffer.vertex(posMatrix, x2, cy, z2).color(r, g, b, a);
-            buffer.vertex(posMatrix, x2, cy + HEIGHT, z2).color(r, g, b, a);
-            buffer.vertex(posMatrix, x1, cy + HEIGHT, z1).color(r, g, b, a);
-            buffer.vertex(posMatrix, x1, cy, z1).color(r, g, b, a);
+            // Inner wall vertices
+            float x1_inner = cx + cos1 * innerRadius;
+            float z1_inner = cz + sin1 * innerRadius;
+            float x2_inner = cx + cos2 * innerRadius;
+            float z2_inner = cz + sin2 * innerRadius;
+
+            // OUTER WALL (visible from outside)
+            buffer.vertex(posMatrix, x1_outer, cy, z1_outer).color(r, g, b, a);
+            buffer.vertex(posMatrix, x1_outer, cy + HEIGHT, z1_outer).color(r, g, b, a);
+            buffer.vertex(posMatrix, x2_outer, cy + HEIGHT, z2_outer).color(r, g, b, a);
+            buffer.vertex(posMatrix, x2_outer, cy, z2_outer).color(r, g, b, a);
+
+            // INNER WALL (visible from inside)
+            buffer.vertex(posMatrix, x2_inner, cy, z2_inner).color(r, g, b, a);
+            buffer.vertex(posMatrix, x2_inner, cy + HEIGHT, z2_inner).color(r, g, b, a);
+            buffer.vertex(posMatrix, x1_inner, cy + HEIGHT, z1_inner).color(r, g, b, a);
+            buffer.vertex(posMatrix, x1_inner, cy, z1_inner).color(r, g, b, a);
+
+            // TOP RING (only if width > 0)
+            if (width > 0) {
+                // Top face connecting outer to inner
+                buffer.vertex(posMatrix, x1_outer, cy + HEIGHT, z1_outer).color(r, g, b, a);
+                buffer.vertex(posMatrix, x1_inner, cy + HEIGHT, z1_inner).color(r, g, b, a);
+                buffer.vertex(posMatrix, x2_inner, cy + HEIGHT, z2_inner).color(r, g, b, a);
+                buffer.vertex(posMatrix, x2_outer, cy + HEIGHT, z2_outer).color(r, g, b, a);
+
+                // BOTTOM RING
+                buffer.vertex(posMatrix, x1_outer, cy, z1_outer).color(r, g, b, a);
+                buffer.vertex(posMatrix, x2_outer, cy, z2_outer).color(r, g, b, a);
+                buffer.vertex(posMatrix, x2_inner, cy, z2_inner).color(r, g, b, a);
+                buffer.vertex(posMatrix, x1_inner, cy, z1_inner).color(r, g, b, a);
+            }
         }
     }
 
